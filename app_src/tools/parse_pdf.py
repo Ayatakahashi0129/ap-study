@@ -17,7 +17,7 @@ EXAMS = [  # (txtファイル, ap-siken id, 表示名, 開始行ヒント)
     ("30年春", "30_haru", "平成30年春期", 0),
     ("31年春", "31_haru", "平成31年春期", 0),
     ("元年秋", "01_aki", "令和元年秋期", 0),
-    ("徹底攻略 応用情報技術者 令和4年度", "03_haru", "令和3年春期", 29400),
+    ("徹底攻略 応用情報技術者 令和4年度", "03_haru", "令和3年春期", 0),
 ]
 
 KANA = "アイウエ"
@@ -25,9 +25,10 @@ Z2H = str.maketrans("０１２３４５６７８９", "0123456789")
 
 NOISE = [
     re.compile(r"^\s*午前\s*(問題|解答と解説)\s*\d+\s*$"),
-    re.compile(r"^\s*\d+\s*付録.*$"),
+    re.compile(r"^\s*\d+\s*付?\s*録.*$"),
     re.compile(r"^\s*(録付|付録)\s*$"),
     re.compile(r"^\s*\d{1,3}\s*$"),
+    re.compile(r"^\s*問\s*\d+\s*から\s*問\s*\d+\s*まで"),     # 「問51から問60までは，…」
 ]
 
 
@@ -143,6 +144,47 @@ GARBLE = re.compile(r"[ɐ-˿Ͱ-οЀ-ۿݐ-ݿᴀ-᷿①-⓿⼀-⿟ﬀ-﻿￰-￿\U
 FIG = re.compile(r"図|表[^すし現示記面計]|グラフ|流れ図|次の(プログラム|擬似|疑似|式|関数)|空欄|〔|［|\[|‘|’|⋮|…")
 
 
+def stem_text(stem):
+    """問題文：ふつうの文は1段落につなげ、プログラムや表のように桁をそろえた行（大きな空白を含む行）は改行と字下げを残す。"""
+    out, prose = [], []
+    for ln in stem.split("\n"):
+        if re.search(r"\S {3,}\S|^ {4,}\S|\t", ln) or re.match(r"^\{table:\d+\}$", ln.strip()):
+            if prose: out += join_para(prose); prose = []
+            out.append(ln.rstrip().replace("\t", "  ") if not ln.strip().startswith("{table:") else ln.strip())
+        else:
+            prose.append(ln)
+    if prose: out += join_para(prose)
+    return "\n".join(l for l in out if l.strip())
+
+
+def table_rows_text(rows):
+    """解説中の表は「a ｜ b ｜ c」の行にして段落として入れる。"""
+    return "\n\n" + "\n".join(" ｜ ".join(c for c in r) for r in rows) + "\n\n"
+
+
+def choices_from_table(body, tables):
+    """選択肢が表（1列目がア〜エ）になっている組合せ問題を、文章の選択肢に直す。"""
+    text = "\n".join(body)
+    for m in re.finditer(r"\{tableref:([^}]+)\}", text):
+        rows = tables.get(m.group(1), [])
+        lab = {r[0].strip(): r for r in rows if r and r[0].strip() in tuple(KANA)}
+        if len(lab) == 4:
+            head = next((r for r in rows if r and r[0].strip() not in tuple(KANA)), None)
+            cs = []
+            for k in KANA:
+                r = lab[k]
+                if head and len(head) == len(r) and all(h.strip() for h in head[1:]):
+                    cs.append("，".join(f"{h.strip()}：{v.strip()}" for h, v in zip(head[1:], r[1:])))
+                else:
+                    cs.append("　".join(v.strip() for v in r[1:]))
+            return text[:m.start()], cs
+    return None, None
+
+
+# 「次の回路」「次のアローダイアグラム」のように、図や表が無いと解けない問題
+NEEDS_FIGURE = re.compile(r"次の[^。，]{0,14}(回路|図|表|プログラム|流れ図|グラフ|状態遷移|ネットワーク|アローダイアグラム|E-R|UML|モデル|SQL|関係|クラス|木|ツリー|構成|手順|処理|擬似|疑似|仕様|条件|式|データ|ファイル|リスト|マトリクス|チャート|決定表)")
+
+
 def parse_choices(body):
     text = "\n".join(body)
     # 選択肢マーカー: 行頭 or 空白の後の ア/イ/ウ/エ + 空白
@@ -164,6 +206,8 @@ def parse_choices(body):
 
 
 def norm(s):
+    s = s.replace("\t", "")       # 斜体の文字の前に入るタブ（「2\tx」→「2x」）
+    s = re.sub(r"(（\s*）\s*)+$", "", s)   # 大きなかっこが別の行に分かれて残ったもの
     s = re.sub(r"\s*\n\s*", "", s.strip()) if "\n" in s else s.strip()
     s = s.replace("　", " ")
     s = re.sub(r"\s{2,}", " ", s)
@@ -180,6 +224,8 @@ def main():
         qb = split_numbered(qs, q_pat)
         ab = split_numbered(ans, a_pat)
         idx = load_index(eid)
+        tf = TXT / f"{fname}.tables.json"
+        tables = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else {}
         ok = bad = 0
         for n in range(1, 81):
             title, cat = idx.get(n, ("", ""))
@@ -190,20 +236,38 @@ def main():
                 m = re.match(r"\s*([アイウエ])", a[0])
                 item["ans"] = KANA.index(m.group(1)) if m else None
                 item["exp"] = join_para(a[1:] if m and not a[0][m.end():].strip() else [a[0][m.end():] if m else a[0]] + a[1:])
+            if item.get("exp"):
+                item["exp"] = join_para(re.sub(r"\{tableref:([^}]+)\}", lambda m: table_rows_text(tables.get(m.group(1), [])), "\n\n".join(item["exp"])).split("\n"))
             b = qb.get(n)
             flags = []
+            tb = []
             if b:
                 stem, cs = parse_choices(b)
                 if stem is None:
+                    stem, cs = choices_from_table(b, tables)
+                if stem is None:
                     flags.append("nochoice")
                 else:
-                    item["q"] = "\n".join(join_para(stem.split("\n")))
-                    item["c"] = [norm(c) for c in cs]
+                    def put(m):
+                        rows = tables.get(m.group(1))
+                        if not rows: return ""
+                        tb.append(rows); return "\n{table:%d}\n" % (len(tb) - 1)
+                    stem = re.sub(r"\{tableref:([^}]+)\}", put, stem)
+                    item["q"] = stem_text(stem)
+                    if tb: item["tb"] = tb
+                    if re.search(r"(?m)^\s*(?:[A-Za-z0-9]{1,3}[ 　]+)+[A-Za-z0-9]{1,3}\s*$", stem):   # 図の中の文字だけが残った行
+                        flags.append("fig")
+                    item["c"] = [norm(re.sub(r"\{tableref:[^}]+\}", "", c)) for c in cs]
                     blob = item["q"] + "".join(item["c"])
                     if GARBLE.search(blob):
                         flags.append("garble")
-                    if FIG.search(item["q"]) or re.search(r"(?m)^(?:[A-Za-z0-9]{1,3}[ 　]+){1,}[A-Za-z0-9]{1,3}$", item["q"]):
+                    fig_q = re.sub(r"表[^すし現示記面計]", "", item["q"]) if tb else item["q"]
+                    if NEEDS_FIGURE.search(fig_q) and not tb:
                         flags.append("fig")
+                    if FIG.search(fig_q) or re.search(r"(?m)^(?:[A-Za-z0-9]{1,3}[ 　]+){1,}[A-Za-z0-9]{1,3}$", item["q"]):
+                        flags.append("fig")
+                    if len(set(item["c"])) < 4:          # 選択肢が図で、文字だけ同じものが残った
+                        flags.append("dupchoice")
                     if any(len(c) == 0 for c in item["c"]):
                         flags.append("empty")
                     if any(len(c) > 160 for c in item["c"]):

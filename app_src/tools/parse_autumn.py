@@ -112,7 +112,7 @@ def fix_text(s):
     s = re.sub(r"かっ(?=[，、])", "かつ", s)
     s = re.sub(r"(?<=[をが])もっ(?=こと|もの|[，。])", "もつ", s)
     s = re.sub(r"ば(?=どれか)", "は", s)
-    s = re.sub(r"(?<![A-Za-z])1P(?=v[46]|アドレス|)", "IP", s)
+    s = re.sub(r"(?<![A-Za-z])1P(?=v[46]|アドレス|\b)", "IP", s)
     s = s.replace("盜", "盗")
     s = re.sub(r"ーっ", "一つ", s)
     for a, b in (("プロードキャスト", "ブロードキャスト"), ("ポップ数", "ホップ数"), ("テープル", "テーブル"), ("ノートプック", "ノートブック"),
@@ -133,11 +133,11 @@ def fix_text(s):
     s = re.sub(r"(?<=。)\s*[^\s。）」)]{1,4}$", "", s) if not re.search(r"。ここで|。また", s[-8:]) else s
     s = s.replace("ァータ", "データ").replace("テータ", "データ")
     s = re.sub(r"(?<=[。])\s*こで，", "ここで，", s)
-    s = re.sub(r"(?<=[>＞<＜=]) ?O", "0", s)
+    s = re.sub(r"(?<=[>＞<＜=]) ?O\b", "0", s)
     s = re.sub(r"ずっ(?!と)", "ずつ", s)
     s = s.replace("ノヾ", "バ").replace("イ旨ロ", "信").replace("イ旨", "信").replace("Ⅷ", "XM").replace("ASCⅡ", "ASCII").replace("灯P", "UDP")
     s = re.sub(r"(?<=[ァ-ヺー])ノレ", "ル", s)
-    s = re.sub(r"(^|[。，])\s*'\s*こで", r"ここで", s)
+    s = re.sub(r"(^|[。，])\s*'\s*こで", r"\1ここで", s)
     s = re.sub(r"(?<=[A-Za-z0-9)）])\s*十\s*(?=[A-Za-z0-9(（])", "＋", s)
     # 難読漢字のふりがな（ルビ）がOCRで本文に混ざったものを除く
     for kanji, ruby in (("脆", "ぜい"), ("脆", "せい"), ("憑", "ひょう"), ("稟", "りん"), ("牽", "けん"), ("瑕疵", "かし"), ("頒", "はん"), ("毀", "き"), ("拗", "よう")):
@@ -287,6 +287,10 @@ def build_question(lines):
 # ---------------------------------------------------------------- 解説・解答
 def load_explanations(name):
     t = (BASE / "txt" / f"{name}.txt").read_text(encoding="utf-8", errors="replace").translate(Z2H)
+    tf = BASE / "txt" / f"{name}.tables.json"
+    tables = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else {}
+    # 解説中の表は「a ｜ b ｜ c」の行にして段落として入れる
+    t = re.sub(r"\{tableref:([^}]+)\}", lambda m: "\n\n" + "\n\n".join(" ｜ ".join(r) for r in tables.get(m.group(1), [])) + "\n\n", t)
     lines = t.splitlines()
     res, cur, buf = {}, None, []
     for ln in lines:
@@ -464,8 +468,6 @@ def main():
                 it["exp"] = []            # 解説の対応がずれている可能性があるので使わない
             if n in ipa:
                 it["ans"] = ipa[n]        # 正解はIPA公表の解答例を優先
-            if eid == "28_aki" and it["exp"]:
-                it["exp"] = ["（注：この回の解説PDFは数字が欠けて読み取られています。数値は問題文を参照してください）"] + it["exp"]
             if not it["exp"]:
                 it["exp"] = [f"正解は{KANA[it['ans']]}（IPA公表の解答例）。"] if it["ans"] is not None else []
             if n in qb:

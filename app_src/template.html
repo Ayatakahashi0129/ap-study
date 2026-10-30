@@ -7,6 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AP科目A">
 <meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Math&display=swap">
 <title>応用情報 科目A対策</title>
 <style>
 :root{
@@ -30,7 +32,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif;line-height:1.7;font-size:16px;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,"Noto Sans Math","Cambria Math",sans-serif;line-height:1.7;font-size:16px;-webkit-text-size-adjust:100%}
 button,input,select{font:inherit;color:inherit}
 header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
 .bar{max-width:880px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -76,6 +78,19 @@ select{border:1px solid var(--line);background:var(--panel);border-radius:10px;p
 .progress{height:6px;background:var(--line);border-radius:999px;overflow:hidden}
 .progress>i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
 .qmeta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:.85rem;margin-bottom:10px}
+.ov{display:inline-block;border-top:1.3px solid currentColor;padding-top:1px;margin-top:3px;line-height:1.15}
+.ul{text-decoration:underline;text-underline-offset:3px}
+.dl{border-bottom:1.5px dashed currentColor;padding-bottom:1px}
+.frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 2px;line-height:1.25}
+.frac>span:first-child{border-bottom:1px solid currentColor;padding:0 2px}
+.frac>span{font-size:.92em}
+.m{font-family:"Noto Sans Math","Cambria Math","STIX Two Math",inherit}
+.stem,.choice,.exp{font-variant-numeric:normal}
+sup,sub{font-size:.72em;line-height:0}
+.qtw{display:block;overflow-x:auto;margin:10px 0;white-space:normal}
+.qt{border-collapse:collapse;font-size:.92rem;min-width:min(100%,360px)}
+.qt th,.qt td{border:1px solid var(--line);padding:5px 9px;text-align:center;vertical-align:middle}
+.qt th{background:var(--accent-soft)}
 .stem{white-space:pre-wrap;font-size:1.02rem;margin:4px 0 16px}
 .choices{display:grid;gap:8px}
 .choice{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:12px 14px;cursor:pointer;line-height:1.6}
@@ -197,6 +212,18 @@ const CARDS = DATA.cards;
 const EXAMS = [...new Set(Q.map(q=>q.src))];
 const $ = (s,r=document)=>r.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+/* 問題文の書式：{ov:…}＝上線（否定・補集合）、{ul:…}／{dl:…}＝実線／破線の下線（主キー／外部キー）、{sup:…}＝上付き、{frac:分子|分母}＝分数、{sub:…}＝下付き、{table:n}＝問題 q.tb[n] の表。
+   PDFから取り出すときに付けた印を、エスケープ後にHTMLへ置き換える（入れ子の上線にも対応） */
+function qfmt(s, q){
+  let h = esc(s);
+  for (let k = 0; k < 4 && /\{(ov|sup|sub|ul|dl):/.test(h); k++)
+    h = h.replace(/\{(ov|sup|sub|ul|dl):([^{}]*)\}/g, (_, t, x) => t==="ov" ? `<span class="ov m">${x}</span>` : t==="ul"||t==="dl" ? `<span class="${t}">${x}</span>` : `<${t}>${x}</${t}>`);
+  h = h.replace(/\{frac:([^|{}]*)\|([^{}]*)\}/g, (_, a, b) => `<span class="frac m"><span>${a}</span><span>${b}</span></span>`);
+  return h.replace(/\{table:(\d+)\}/g, (_, n) => {
+    const tb = q && q.tb && q.tb[+n]; if (!tb) return "";
+    return `<span class="qtw"><table class="qt">${tb.map((r,i)=>`<tr>${r.map(c=>i===0&&q.th!==0?`<th>${qfmt(c)}</th>`:`<td>${qfmt(c)}</td>`).join("")}</tr>`).join("")}</table></span>`;
+  });
+}
 const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; };
 const pct = (a,b) => b? Math.round(a*100/b) : 0;
 
@@ -204,7 +231,7 @@ const pct = (a,b) => b? Math.round(a*100/b) : 0;
 const KEY = "apA-study-v1";
 let S = { ans:{}, flag:{}, box:{}, hist:[] };
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch(e) {}
-function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} scheduleSync(); }
 function record(q, ok){
   const r = S.ans[q.id] || {n:0, c:0, last:null, streak:0};
   r.n++; if (ok) { r.c++; r.streak=(r.streak||0)+1; } else r.streak=0;
@@ -359,10 +386,10 @@ function renderQuiz(){
     <div class="progress"><i style="width:${pct(s.i+1,s.list.length)}%"></i></div>
     <div class="panel" style="margin-top:14px">
       <div class="qmeta"><span class="tag ${q.f}">${FIELD[q.f]}</span><span>${esc(q.g)}</span><span>・${esc(q.cat)}</span><span style="margin-left:auto">${src}</span></div>
-      <div class="stem">${esc(q.q)}</div>
+      <div class="stem">${qfmt(q.q, q)}</div>
       <div class="choices">${q.c.map((c,i)=>{
         let cls=""; if(reveal){ if(i===q.a) cls="ok"; else if(i===chosen) cls="ng"; } else if(i===chosen) cls="sel";
-        return `<button class="choice ${cls}" data-i="${i}" ${reveal?"disabled":""}><span class="k">${KANA[i]}</span><span>${esc(c)}</span></button>`; }).join("")}</div>
+        return `<button class="choice ${cls}" data-i="${i}" ${reveal?"disabled":""}><span class="k">${KANA[i]}</span><span>${qfmt(c, q)}</span></button>`; }).join("")}</div>
       ${reveal?`<div class="verdict ${chosen===q.a?"ok":"ng"}">${chosen===q.a?"正解！":"不正解…"}　正解は ${KANA[q.a]}</div>
         <div class="exp">${expHTML(q, "")}</div>
         <div class="row small" style="margin-top:8px">${link}</div>
@@ -440,8 +467,8 @@ function renderResult(){
     <h2>全問題の振り返り</h2>
     <div class="list">${qs.map((q,i)=>{ const c=s.pick[q.id], good=c===q.a; return `
       <details class="item"><summary class="row"><b class="${good?"pass":"fail"}">${good?"○":"×"}</b><span>${i+1}. ${esc(q.title||q.q.slice(0,40))}</span><span class="small muted" style="margin-left:auto">${q.eid?esc(q.src)+" 問"+q.no:"新傾向"}</span></summary>
-        <div class="stem" style="margin-top:10px">${esc(q.q)}</div>
-        ${q.c.map((t,j)=>`<div class="small" style="margin:2px 0;${j===q.a?"color:var(--ok);font-weight:700":j===c?"color:var(--ng)":""}">${KANA[j]} ${esc(t)}${j===q.a?"（正解）":j===c?"（あなたの解答）":""}</div>`).join("")}
+        <div class="stem" style="margin-top:10px">${qfmt(q.q, q)}</div>
+        ${q.c.map((t,j)=>`<div class="small" style="margin:2px 0;${j===q.a?"color:var(--ok);font-weight:700":j===c?"color:var(--ng)":""}">${KANA[j]} ${qfmt(t, q)}${j===q.a?"（正解）":j===c?"（あなたの解答）":""}</div>`).join("")}
         ${c===undefined?`<div class="small fail">未解答</div>`:""}
         <div class="exp">${expHTML(q, "small")}</div>
       </details>`; }).join("")}</div>`;
@@ -654,6 +681,7 @@ function markCard(ok){
   const c = CS.deck[CS.i]; if(!c) return;
   if (ok) { S.box[c.t] = Math.min(3,(S.box[c.t]||0)+1); CS.good++; }
   else { S.box[c.t] = 0; CS.bad++; CS.deck.push(c); }
+  (S.boxT = S.boxT || {})[c.t] = Date.now();      // 端末間の同期で新しい方を採るための時刻
   save(); CS.i++; CS.flip=false; renderCards();
 }
 
@@ -691,6 +719,13 @@ function renderRecord(){
     ${DATA.locked ? `<h2>過去問の解説</h2>
     <div class="panel row spread"><span>${UNLOCKED ? "🔓 合言葉を入力済み（過去問の解説を表示中）" : "🔒 過去問の解説は合言葉を入力すると表示されます"}</span>
       ${UNLOCKED ? `<button class="btn sm" id="lockbtn">この端末から合言葉を消す</button>` : `<button class="btn sm primary" data-unlock>合言葉を入力</button>`}</div>` : ""}
+    <h2>端末間の同期</h2>
+    <div class="panel">
+      ${ghToken() ? `<div class="row spread"><span>🔄 同期中：${esc(SYNC.msg || "準備完了")}</span><span class="row"><button class="btn sm" id="syncnow">今すぐ同期</button><button class="btn sm ghost" id="syncoff">この端末の同期をやめる</button></span></div>`
+        : `<p class="small" style="margin-top:0">GitHubの<b>gist</b>権限だけを付けた個人用アクセストークンを入力すると、学習記録（解いた問題・カードの習得度・履歴）を自分の<b>非公開Gist</b>に保存し、同じトークンを入れた端末どうしで自動的に共有します。</p>
+           <div class="row"><input type="password" id="ghtoken" placeholder="ghp_… または github_pat_…" autocomplete="off" style="flex:1;min-width:200px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 10px"><button class="btn sm primary" id="syncsave">同期を始める</button></div>
+           <p class="small muted">トークンは github.com → Settings → Developer settings → Personal access tokens で作れます（必要な権限は gist だけ）。トークンはこの端末のブラウザ内にだけ保存されます。${SYNC.msg?`<br>${esc(SYNC.msg)}`:""}</p>`}
+    </div>
     <h2>データ</h2>
     <div class="panel row">
       <button class="btn sm" id="exp">記録を書き出す（JSON）</button>
@@ -700,16 +735,73 @@ function renderRecord(){
     <p class="note">記録はこのブラウザのlocalStorageに保存されます。別のPCやブラウザに移すときは「書き出す」→「読み込む」を使ってください。</p>`;
   $("#exp").onclick = ()=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"})); a.download=`ap-study-${new Date().toISOString().slice(0,10)}.json`; a.click(); };
   $("#imp").onchange = async e=>{ const f=e.target.files[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); S=Object.assign({ans:{},flag:{},box:{},hist:[]}, d); save(); alert("読み込みました"); renderRecord(); }catch(err){ alert("読み込めませんでした"); } };
-  $("#rst").onclick = ()=>{ if(confirm("解答記録・カードの習得度・履歴をすべて消去します。よろしいですか？")){ S={ans:{},flag:{},box:{},hist:[]}; save(); CS=null; renderRecord(); } };
+  $("#rst").onclick = ()=>{ if(confirm("解答記録・カードの習得度・履歴をすべて消去します。よろしいですか？")){ S={ans:{},flag:{},box:{},hist:[],resetAt:Date.now()}; save(); CS=null; renderRecord(); } };
+  $("#syncsave").onclick = ()=>{ const t=$("#ghtoken").value.trim(); if(!t) return; try{ localStorage.setItem(KEY+"-gh", t); localStorage.removeItem(KEY+"-gist"); }catch(e){} syncNow(true); };
+  if ($("#syncnow")) $("#syncnow").onclick = ()=>syncNow(true);
+  if ($("#syncoff")) $("#syncoff").onclick = ()=>{ try{ localStorage.removeItem(KEY+"-gh"); localStorage.removeItem(KEY+"-gist"); }catch(e){} SYNC.msg="同期をやめました（この端末のトークンを削除）"; renderRecord(); };
   if ($("#lockbtn")) $("#lockbtn").onclick = ()=>{ try{ localStorage.removeItem(KEY+"-pass"); }catch(e){} location.reload(); };
 }
+
+/* ---------- 端末間の同期（GitHub Gist） ----------
+   学習記録 S を、利用者のGitHubアカウントの非公開Gist（ファイル名 ap-study-progress.json）に保存し、
+   端末ごとの記録と項目単位でマージする：解答は新しい方、カードは更新時刻が新しい方、履歴は和集合。 */
+const SYNC = { msg:"", busy:false, timer:null };
+const GIST_FILE = "ap-study-progress.json";
+const ghToken = () => { try { return localStorage.getItem(KEY+"-gh"); } catch(e) { return null; } };
+function scheduleSync(){ if (!ghToken()) return; clearTimeout(SYNC.timer); SYNC.timer = setTimeout(()=>syncNow(false), 4000); }
+async function gh(path, opt={}){
+  const r = await fetch("https://api.github.com"+path, {...opt, headers:{"Authorization":"Bearer "+ghToken(), "Accept":"application/vnd.github+json", ...(opt.body?{"Content-Type":"application/json"}:{})}});
+  if (!r.ok) throw new Error(r.status===401 ? "トークンが無効です" : r.status===403||r.status===404 ? "トークンに gist 権限がありません" : "GitHub API エラー "+r.status);
+  return r.json();
+}
+function mergeState(a, b){
+  const reset = Math.max(a.resetAt||0, b.resetAt||0), newer = (x,y)=>((x&&x.t)||0) >= ((y&&y.t)||0) ? x : y;
+  const out = { ans:{}, flag:{...b.flag, ...a.flag}, box:{}, boxT:{}, hist:[], resetAt:reset };
+  for (const id of new Set([...Object.keys(a.ans||{}), ...Object.keys(b.ans||{})])) { const r = newer(a.ans?.[id], b.ans?.[id]); if (r && (r.t||0) >= reset) out.ans[id] = r; }
+  for (const k of new Set([...Object.keys(a.box||{}), ...Object.keys(b.box||{})])) {
+    const ta = a.boxT?.[k]||0, tb = b.boxT?.[k]||0, src = ta >= tb ? a : b, t = Math.max(ta, tb);
+    if (t >= reset || !t) { out.box[k] = src.box?.[k] ?? 0; if (t) out.boxT[k] = t; }
+  }
+  const seen = new Set();
+  for (const h of [...(a.hist||[]), ...(b.hist||[])]) { if (h.t >= reset && !seen.has(h.t)) { seen.add(h.t); out.hist.push(h); } }
+  out.hist.sort((x,y)=>y.t-x.t); out.hist = out.hist.slice(0,100);
+  return out;
+}
+async function syncNow(manual){
+  if (!ghToken() || SYNC.busy) return;
+  SYNC.busy = true; if (manual) { SYNC.msg = "同期しています…"; if (view==="record") renderRecord(); }
+  try {
+    let id = null; try { id = localStorage.getItem(KEY+"-gist"); } catch(e) {}
+    if (!id) {   // 既存のGistを探す（別の端末で作られていればそれを使う）
+      const list = await gh("/gists?per_page=100");
+      id = list.find(g => g.files && g.files[GIST_FILE])?.id || null;
+    }
+    let remote = { ans:{}, flag:{}, box:{}, hist:[] };
+    if (id) {
+      const g = await gh("/gists/"+id);
+      const f = g.files[GIST_FILE];
+      const text = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
+      try { remote = JSON.parse(text); } catch(e) {}
+    }
+    const merged = mergeState(S, remote);
+    const body = JSON.stringify({ description:"応用情報 科目A対策 の学習記録（自動同期）", files:{ [GIST_FILE]:{ content: JSON.stringify(merged) } } });
+    if (id) await gh("/gists/"+id, {method:"PATCH", body});
+    else { const g = await gh("/gists", {method:"POST", body: JSON.stringify({...JSON.parse(body), public:false})}); id = g.id; }
+    try { localStorage.setItem(KEY+"-gist", id); localStorage.setItem(KEY, JSON.stringify(merged)); } catch(e) {}
+    S = merged;
+    SYNC.msg = `${new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})} に同期しました（解いた問題 ${Object.keys(S.ans).length}問）`;
+    if (view==="home" || view==="record") render();
+  } catch(e) { SYNC.msg = "同期できませんでした：" + e.message; if (view==="record") renderRecord(); }
+  SYNC.busy = false;
+}
+document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible") syncNow(false); });
 
 /* ---------- 公開版：過去問の解説の合言葉ロック ----------
    公開版（GitHub Pages）では、参考書・解説PDF由来の解説を AES-GCM で暗号化して埋め込んでいる。
    合言葉から PBKDF2 で鍵を作って復号し、成功したら合言葉をこの端末に保存する。 */
 let UNLOCKED = false;
 function expHTML(q, cls){
-  if (q.e.length) return q.e.map(p=>`<p class="${cls}">${esc(p)}</p>`).join("");
+  if (q.e.length) return q.e.map(p=>`<p class="${cls}">${qfmt(p, q)}</p>`).join("");
   if (q.lk) return `<p class="${cls} muted">🔒 この問題の解説は合言葉を入力すると表示されます。　<a href="#" data-unlock>合言葉を入力</a></p>`;
   return "";
 }
@@ -733,6 +825,7 @@ document.addEventListener("click", async e=>{
 (async ()=>{
   if (DATA.locked) { let p=null; try{ p=localStorage.getItem(KEY+"-pass"); }catch(e){} if (p) { try { await unlock(p); } catch(e){} } }
   render();
+  syncNow(false);
 })();
 </script>
 </body>

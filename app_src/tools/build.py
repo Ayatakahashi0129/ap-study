@@ -79,7 +79,7 @@ def main():
             continue
         qs.append({"id": x["id"], "src": x["exam"], "eid": x["eid"], "no": x["no"], "title": x["title"],
                    "cat": x["cat"], "g": group_of(x["cat"]), "f": x["field"],
-                   "q": x["q"], "c": x["c"], "a": x["ans"], "e": x["exp"]})
+                   "q": x["q"], "c": x["c"], "a": x["ans"], "e": x["exp"], **({"tb": x["tb"]} if x.get("tb") else {})})
     # 秋期（問題文はIPA公開PDFのOCR，分類は推定。tools/parse_autumn.py で生成）
     autumn = SRC / "data/autumn.json"
     if autumn.exists():
@@ -89,6 +89,23 @@ def main():
             qs.append({"id": x["id"], "src": x["exam"], "eid": x["eid"], "no": x["no"], "title": x["title"],
                        "cat": x["cat"], "g": x["g"], "f": x["field"],
                        "q": x["q"], "c": x["c"], "a": x["ans"], "e": x["exp"]})
+    # 目視確認による修正（data/corrections.json）：置換・差し替え・除外
+    corr = json.loads((SRC / "data/corrections.json").read_text(encoding="utf-8"))
+    for q in qs:
+        c = corr.get(q["id"])
+        if not c: continue
+        for old, new in c.get("replace", []):
+            q["q"] = q["q"].replace(old, new); q["title"] = q["title"].replace(old, new); q["c"] = [x.replace(old, new) for x in q["c"]]; q["e"] = [x.replace(old, new) for x in q["e"]]
+        for k in ("q", "c", "e", "tb"):
+            if k in c: q[k] = c[k]
+    qs = [q for q in qs if not corr.get(q["id"], {}).get("exclude")]
+    for q in qs:   # OCRで句点が落ちた「どれかここで」などを直す
+        q["q"] = re.sub(r"(どれか|幾らか|何%か|何秒か|何秒後か|何サイクル必要となるか)(ここで)", r"\1。\2", q["q"])
+        # 斜体の t がかっこの後ろに回った「fac（t n）」「in（t r）」を「fact（n）」「int（r）」に戻す
+        fx = lambda x: re.sub(r"\b(fac|nex|in)（t\s*", r"\1t（", x)
+        q["q"] = fx(q["q"]); q["c"] = [fx(x) for x in q["c"]]; q["e"] = [fx(x) for x in q["e"]]
+        cc = lambda x: re.sub(r"[\x00-\x08\x0b-\x1f]", "", x)
+        q["q"] = cc(q["q"]); q["c"] = [cc(x) for x in q["c"]]; q["e"] = [cc(x) for x in q["e"]]
     # 出典を試験の実施順に並べる（平成は1988＋年，令和は2018＋年）
     year = lambda eid: (int(eid[:2]) + (2018 if eid.startswith("0") else 1988), eid.endswith("aki"))
     qs.sort(key=lambda q: (year(q["eid"]), q["no"]))

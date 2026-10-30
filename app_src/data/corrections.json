@@ -1,0 +1,39 @@
+{
+ "_説明": "元PDFの画像と見比べて直した箇所。replace＝問題文・選択肢・解説の置換、q/c/e/tb＝差し替え、exclude＝出題しない",
+ "31_haru-1": {
+  "replace": [
+   [
+    "nex（t ",
+    "next（"
+   ],
+   [
+    "整数nに対して，と定義する。",
+    "整数nに対して，\nnext（n）＝ n＋1（0≦n＜255 のとき）\nnext（n）＝ 0　 （n＝255 のとき）\nと定義する。"
+   ]
+  ]
+ },
+ "30_haru-5": {
+  "replace": [
+   [
+    "次のとおりに定義された関数Ack（m，n）がある。",
+    "次のとおりに定義された関数Ack（m，n）がある。\nAck（m，n）＝ n＋1　　　　　　　　（m＝0 のとき）\nAck（m，n）＝ Ack（m−1，1）　　　　（m＞0，n＝0 のとき）\nAck（m，n）＝ Ack（m−1，Ack（m，n−1））（m＞0，n＞0 のとき）\n"
+   ]
+  ]
+ },
+ "27_haru-2": {
+  "c": [
+   "2x＋4int（{frac:x|2}）",
+   "2x＋5int（{frac:x|2}）",
+   "2x−3int（{frac:x|2}）",
+   "2x−4int（{frac:x|2}）"
+  ]
+ },
+ "28_aki-63": {
+  "replace": [
+   [
+    "lntelligence",
+    "Intelligence"
+   ]
+  ]
+ }
+}

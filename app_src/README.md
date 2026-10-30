@@ -13,7 +13,14 @@
 - `data/flashcards.json` … 暗記カード `[分類, 分野(T/M/S), 用語, 説明]`
 - `template.html` … アプリ本体
 - `tools/build.py` … 上記を埋め込んで `AP科目A対策.html` を生成
-- `tools/parse_pdf.py` … PDF→JSON 抽出スクリプト（pdftotext の出力と ap-siken.com の年度別一覧を入力に使用）
+- `tools/parse_pdf.py` … PDF→JSON 抽出スクリプト（下の書式付きテキストと ap-siken.com の年度別一覧を入力に使用）
+- `tools/pdf_marked.py`・`tools/extract_all.py` … PyMuPDF で PDF を読み、文字の大きさ・位置と罫線から書式を復元したテキストを作る。
+  `{sup:}` 上付き、`{sub:}` 下付き、`{ov:}` 否定・補集合の横棒、`{ul:}`／`{dl:}` 実線／破線の下線（主キー／外部キー）、`{frac:分子|分母}` 分数、`{tableref:}` 表
+- `data/corrections.json` … 元PDFの画像と見比べて直した問題（置換・差し替え・除外）
+- `tools/quality.py`・`tools/gt_sample.py`・`tools/ui_test.js` … 品質チェック、元PDF画像との見比べ用サンプル出力、ブラウザでの動作テスト（全問を解いて判定・表示を確認）
+
+## 端末間の同期
+記録画面で GitHub の個人用アクセストークン（gist 権限のみ）を入れると、学習記録を非公開Gist `ap-study-progress.json` に保存し、同じトークンの端末どうしで自動的にマージする（解答は新しい方、カードは更新時刻が新しい方、履歴は和集合）。
 
 ## 問題やカードを追加したら
 ```
