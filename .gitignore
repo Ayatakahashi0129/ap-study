@@ -1,0 +1,13 @@
+# 著作権のある資料・その文章を含むファイルは公開リポジトリに入れない
+応用情報/
+*.pdf
+AP科目A対策.html
+app_src/data/past.json
+app_src/data/autumn.json
+
+# 公開版の解説を暗号化する合言葉
+app_src/.passphrase
+
+# ローカル設定・一時ファイル
+.claude/
+__pycache__/
