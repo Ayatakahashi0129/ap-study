@@ -100,6 +100,20 @@ def main():
                        "cat": x["cat"], "g": x["g"], "f": x["field"], "q": "" if only else x["q"], "c": ["", "", "", ""] if only else x["c"], "a": x["ans"],
                        "e": [f"正解は{KANA[x['ans']]}（IPA公表の解答例）。この年度は解説がないので，詳しくは下の「サイトで原文・解説を見る」で確認してください。"],
                        "free": 1, **({"img": img} if img else {}), **({"io": 1} if only else {})})
+    # 令和4年以降の独自の解説（data/recent_exp.txt。「@問題ID」の後の各行が1段落）
+    ef = SRC / "data/recent_exp.txt"
+    if ef.exists():
+        own, cur = {}, None
+        for ln in ef.read_text(encoding="utf-8").splitlines():
+            if ln.startswith("#") or not ln.strip():
+                continue
+            if ln.startswith("@"):
+                cur = own.setdefault(ln[1:].strip(), [])
+            elif cur is not None:
+                cur.append(ln.strip())
+        for q in qs:
+            if q["id"] in own:
+                q["e"] = own[q["id"]]
     # 目視確認による修正（data/corrections.json）：置換・差し替え・除外
     corr = json.loads((SRC / "data/corrections.json").read_text(encoding="utf-8"))
     for q in qs:
