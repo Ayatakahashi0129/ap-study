@@ -123,6 +123,8 @@ def main():
             q["q"] = q["q"].replace(old, new); q["title"] = q["title"].replace(old, new); q["c"] = [x.replace(old, new) for x in q["c"]]; q["e"] = [x.replace(old, new) for x in q["e"]]
         for k in ("q", "c", "e", "tb"):
             if k in c: q[k] = c[k]
+        if c.get("io") and q.get("img"):   # OCRの崩れがひどい問題は，問題冊子の画像だけで出す
+            q["q"], q["c"], q["io"] = "", ["", "", "", ""], 1
     qs = [q for q in qs if not corr.get(q["id"], {}).get("exclude")]
     for q in qs:   # OCRで句点が落ちた「どれかここで」などを直す
         q["q"] = re.sub(r"(どれか|幾らか|何%か|何秒か|何秒後か|何サイクル必要となるか)(ここで)", r"\1。\2", q["q"])
