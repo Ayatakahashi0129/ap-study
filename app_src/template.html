@@ -736,7 +736,8 @@ function renderRecord(){
   $("#exp").onclick = ()=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"})); a.download=`ap-study-${new Date().toISOString().slice(0,10)}.json`; a.click(); };
   $("#imp").onchange = async e=>{ const f=e.target.files[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); S=Object.assign({ans:{},flag:{},box:{},hist:[]}, d); save(); alert("読み込みました"); renderRecord(); }catch(err){ alert("読み込めませんでした"); } };
   $("#rst").onclick = ()=>{ if(confirm("解答記録・カードの習得度・履歴をすべて消去します。よろしいですか？")){ S={ans:{},flag:{},box:{},hist:[],resetAt:Date.now()}; save(); CS=null; renderRecord(); } };
-  $("#syncsave").onclick = ()=>{ const t=$("#ghtoken").value.trim(); if(!t) return; try{ localStorage.setItem(KEY+"-gh", t); localStorage.removeItem(KEY+"-gist"); }catch(e){} syncNow(true); };
+  // 同期中の画面には「同期を始める」ボタンが無いので、存在するボタンにだけ処理を付ける
+  if ($("#syncsave")) $("#syncsave").onclick = ()=>{ const t=$("#ghtoken").value.trim(); if(!t) return; try{ localStorage.setItem(KEY+"-gh", t); localStorage.removeItem(KEY+"-gist"); }catch(e){} syncNow(true); };
   if ($("#syncnow")) $("#syncnow").onclick = ()=>syncNow(true);
   if ($("#syncoff")) $("#syncoff").onclick = ()=>{ try{ localStorage.removeItem(KEY+"-gh"); localStorage.removeItem(KEY+"-gist"); }catch(e){} SYNC.msg="同期をやめました（この端末のトークンを削除）"; renderRecord(); };
   if ($("#lockbtn")) $("#lockbtn").onclick = ()=>{ try{ localStorage.removeItem(KEY+"-pass"); }catch(e){} location.reload(); };
