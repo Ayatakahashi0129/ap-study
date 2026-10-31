@@ -104,6 +104,11 @@ def main():
         # 斜体の t がかっこの後ろに回った「fac（t n）」「in（t r）」を「fact（n）」「int（r）」に戻す
         fx = lambda x: re.sub(r"\b(fac|nex|in)（t\s*", r"\1t（", x)
         q["q"] = fx(q["q"]); q["c"] = [fx(x) for x in q["c"]]; q["e"] = [fx(x) for x in q["e"]]
+        # PDFの合字（ll・fi）が抜けたりずれたりした英単語と，「::」の間に入った空白を戻す
+        lig = lambda x: re.sub(r": :(?=[＝=0-9A-Fa-f])", "::", re.sub(r"fci ", "fic", re.sub(r"\bFirewal\b", "Firewall", re.sub(r"\bShel\b", "Shell",
+              x.replace("cal by ", "call by ").replace("Chal enge", "Challenge").replace("El iptic", "Elliptic").replace("Ofcfi e", "Office")
+               .replace("Matematical", "Mathematical").replace("Intelig ence", "Intelligence").replace("Inteligence", "Intelligence")))))
+        q["q"] = lig(q["q"]); q["c"] = [lig(x) for x in q["c"]]; q["e"] = [lig(x) for x in q["e"]]; q["title"] = lig(q["title"])
         cc = lambda x: re.sub(r"[\x00-\x08\x0b-\x1f]", "", x)
         q["q"] = cc(q["q"]); q["c"] = [cc(x) for x in q["c"]]; q["e"] = [cc(x) for x in q["e"]]
     # 出典を試験の実施順に並べる（平成は1988＋年，令和は2018＋年）

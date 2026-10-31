@@ -76,6 +76,8 @@ def page_text(page, pid, tables_out):
             if not chars:
                 continue
             if max(ch["size"] for ch in chars) < body * 0.8:
+                if re.fullmatch(r"[ぁ-ゖー]+", "".join(ch["c"] for ch in chars if ch["c"].strip())):
+                    continue      # 難しい漢字のふりがな（ルビ）。本文に混ざると「どれか。ぜい」のようになる
                 small.append(chars); continue
             sizes = sorted(ch["size"] for ch in chars)
             main = sizes[len(sizes) // 2]
