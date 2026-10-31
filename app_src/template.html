@@ -104,6 +104,10 @@ sup,sub{font-size:.72em;line-height:0}
 .verdict.ok{color:var(--ok)} .verdict.ng{color:var(--ng)}
 .exp{border-left:3px solid var(--accent);padding:4px 0 4px 14px;margin-top:8px}
 .exp p{margin:.45em 0}
+.exp .econ{font-weight:700;color:var(--ok)}
+.ech{display:flex;gap:10px;align-items:flex-start;margin:.55em 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.ech .ek{flex:0 0 auto;min-width:24px;height:24px;padding:0 6px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:.85rem}
+.ech.ok{border-color:var(--ok)} .ech.ok .ek{background:var(--ok);color:var(--panel)}
 .navq{display:flex;gap:8px;justify-content:space-between;margin-top:18px;flex-wrap:wrap}
 .timer{font-variant-numeric:tabular-nums;font-weight:700}
 .palette{display:flex;flex-wrap:wrap;gap:4px;margin-top:12px}
@@ -802,8 +806,45 @@ document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState
    公開版（GitHub Pages）では、参考書・解説PDF由来の解説を AES-GCM で暗号化して埋め込んでいる。
    合言葉から PBKDF2 で鍵を作って復号し、成功したら合言葉をこの端末に保存する。 */
 let UNLOCKED = false;
+// 長い解説を読みやすく分ける：本文は2〜3文ごとに段落、「したがって…」の結論、「ア …」「イ，ウ …」の選択肢ごとの説明
+function expSplit(txt){
+  const out = []; let depth = 0, last = 0;
+  for (let i = 0; i < txt.length; i++){
+    const ch = txt[i];
+    if (ch === "{") depth++; else if (ch === "}") depth--;
+    if (depth || i === 0) continue;
+    const prev = txt.slice(0, i).replace(/[\s　]+$/, "");
+    if (!prev.endsWith("。")) continue;
+    if (/^[アイウエ](?:[，、・][アイウエ])*[ 　]/.test(txt.slice(i)) || txt.startsWith("したがって", i)){
+      out.push(txt.slice(last, i)); last = i;
+    }
+  }
+  out.push(txt.slice(last));
+  return out.map(s=>s.trim()).filter(Boolean);
+}
+function expSentences(s){
+  if (s.length < 140) return [s];
+  // 文末（後ろの「……（1）」の印も含めて）で切り、80字以上たまったら段落を改める
+  const parts = s.match(/[^。]*。(?:[…\s　]*（\d+）)?(?![」）』])|[^。]+$/g) || [s];
+  const out = []; let cur = "";
+  for (const p of parts){ cur += p; if (cur.length >= 80){ out.push(cur); cur = ""; } }
+  if (cur) { if (out.length && cur.length < 30) out[out.length-1] += cur; else out.push(cur); }
+  return out;
+}
 function expHTML(q, cls){
-  if (q.e.length) return q.e.map(p=>`<p class="${cls}">${qfmt(p, q)}</p>`).join("");
+  if (q.e.length) return q.e.flatMap(expSplit).map(seg=>{
+    const m = seg.match(/^([アイウエ](?:[，、・][アイウエ])*)[ 　]+([\s\S]*)$/);
+    if (m){
+      const ks = m[1].split(/[，、・]/), st = ks.includes(KANA[q.a]) ? " ok" : "";
+      return `<div class="ech${st} ${cls}"><span class="ek">${ks.join("・")}</span><div>${qfmt(m[2], q)}</div></div>`;
+    }
+    let head = "";
+    if (seg.startsWith("したがって")){   // 結論の1文だけ強調し、続く「アは…，イは…」は普通の段落にする
+      const k = seg.indexOf("。") + 1 || seg.length;
+      head = `<p class="econ ${cls}">${qfmt(seg.slice(0, k), q)}</p>`; seg = seg.slice(k).trim();
+    }
+    return head + (seg ? expSentences(seg).map(p=>`<p class="${cls}">${qfmt(p, q)}</p>`).join("") : "");
+  }).join("");
   if (q.lk) return `<p class="${cls} muted">🔒 この問題の解説は合言葉を入力すると表示されます。　<a href="#" data-unlock>合言葉を入力</a></p>`;
   return "";
 }
