@@ -142,7 +142,10 @@ def build_public(data, tpl):
         alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
         pf.write_text("-".join("".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(4)), encoding="utf-8")
         print("合言葉を新しく作りました:", pf)
-    passphrase = pf.read_text(encoding="utf-8").strip()
+    # アプリ側の normPass と同じ規則でそろえる（全角→半角、各種ハイフン→「-」、空白除去）。BOM付き保存にも対応
+    import unicodedata
+    passphrase = unicodedata.normalize("NFKC", pf.read_text(encoding="utf-8-sig"))
+    passphrase = re.sub(r"\s+", "", re.sub("[‐‑‒–—―−ーｰ－﹣]", "-", passphrase))
 
     pub = json.loads(json.dumps(data, ensure_ascii=False))
     hidden = {}

@@ -805,8 +805,11 @@ function expHTML(q, cls){
   if (q.lk) return `<p class="${cls} muted">🔒 この問題の解説は合言葉を入力すると表示されます。　<a href="#" data-unlock>合言葉を入力</a></p>`;
   return "";
 }
+// スマホの日本語キーボードで入りやすい全角文字・別のハイフン記号・空白を、そろえてから使う（build.py と同じ規則）
+const normPass = p => String(p).normalize("NFKC").replace(/[‐‑‒–—―−ーｰ－﹣]/g, "-").replace(/\s+/g, "");
 async function unlock(pass){
   const L = DATA.locked, b = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+  pass = normPass(pass);
   const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey({name:"PBKDF2", salt:b(L.salt), iterations:L.iter, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
   const plain = await crypto.subtle.decrypt({name:"AES-GCM", iv:b(L.iv)}, key, b(L.ct));   // 合言葉が違うとここで失敗する
