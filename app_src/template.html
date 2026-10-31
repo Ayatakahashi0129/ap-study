@@ -305,6 +305,7 @@ function pool(){
   let p = Q;
   if (SETUP.src==="past") p = p.filter(q=>q.eid);
   if (SETUP.src==="orig") p = p.filter(q=>!q.eid);
+  if (SETUP.src==="recent") p = p.filter(q=>!q.eid || q.eid.startsWith("0"));   // 令和の出典IDは 01_aki, 03_haru のように 0 で始まる
   if (SETUP.src==="exam") p = p.filter(q=>q.src===SETUP.exam);
   p = p.filter(q=>SETUP.fields[q.f]);
   const gs = Object.keys(SETUP.groups).filter(g=>SETUP.groups[g]);
@@ -322,7 +323,7 @@ function renderSetup(){
     <h1>テストの条件</h1>
     <div class="panel">
       <fieldset><legend>出題元</legend>
-        ${radios("src", [["all","すべて"],["past","過去問のみ"],["orig","新傾向オリジナル"],["exam","年度を指定"]], SETUP.src)}
+        ${radios("src", [["all","すべて"],["past","過去問のみ"],["orig","新傾向オリジナル"],["recent","令和元年度以降＋新傾向"],["exam","年度を指定"]], SETUP.src)}
         <div style="margin-top:8px;${SETUP.src==="exam"?"":"display:none"}"><select id="exam">${EXAMS.map(x=>`<option ${x===SETUP.exam?"selected":""}>${esc(x)}</option>`).join("")}</select></div>
       </fieldset>
       <fieldset><legend>分野</legend>
@@ -352,7 +353,7 @@ function renderSetup(){
     let p = pool();
     p = SETUP.order==="rand" ? shuffle(p) : [...p].sort((a,b)=> EXAMS.indexOf(a.src)-EXAMS.indexOf(b.src) || a.no-b.no);
     if (SETUP.n) p = p.slice(0, SETUP.n);
-    startQuiz(p, {mode:SETUP.mode, title: SETUP.src==="exam"? SETUP.exam : "演習"});
+    startQuiz(p, {mode:SETUP.mode, title: SETUP.src==="exam"? SETUP.exam : SETUP.src==="recent"? "令和元年度以降＋新傾向" : "演習"});
   };
 }
 function startMock(){
