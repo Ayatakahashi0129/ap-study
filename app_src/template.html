@@ -104,6 +104,8 @@ sup,sub{font-size:.72em;line-height:0}
 .verdict.ok{color:var(--ok)} .verdict.ng{color:var(--ng)}
 .exp{border-left:3px solid var(--accent);padding:4px 0 4px 14px;margin-top:8px}
 .exp p{margin:.45em 0}
+.qimgd{margin-top:8px;font-size:.85rem;color:var(--muted);white-space:normal} .qimgd summary{cursor:pointer} .qimgd .qimg{margin-top:6px}
+.qimg{display:block;max-width:100%;height:auto;background:#fff;border-radius:6px;padding:6px;margin:0 0 6px}
 .exp .econ{font-weight:700;color:var(--ok)}
 .ech{display:flex;gap:10px;align-items:flex-start;margin:.55em 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
 .ech .ek{flex:0 0 auto;min-width:24px;height:24px;padding:0 6px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:.85rem}
@@ -286,7 +288,7 @@ function renderHome(){
     <h2>分野別の正答率</h2>
     <div class="panel bars">${fld.map(x=>bar(FIELD[x.f], x.c, x.n, `var(--${x.f})`, `${x.n}/${x.tot}問`)).join("")}</div>
     <p class="note">合格基準は科目A・科目Bともに60%以上。正答率は各問題の「最後に解いたときの正誤」で計算しています。学習記録はこのブラウザの中だけに保存されます。</p>
-    <p class="note">過去問題の出典：独立行政法人情報処理推進機構（IPA）応用情報技術者試験 午前問題（平成25年〜令和3年）。新傾向オリジナル問題・暗記カード・要点解説は独自に作成したものです。</p>`;
+    <p class="note">過去問題の出典：独立行政法人情報処理推進機構（IPA）応用情報技術者試験 午前問題（平成25年〜令和7年）。令和4年以降は解説がなく，図表を含む問題は問題冊子の画像で出題します。新傾向オリジナル問題・暗記カード・要点解説は独自に作成したものです。</p>`;
   $("#app").onclick = e=>{ const b=e.target.closest("[data-q]"); if(!b) return;
     const k=b.dataset.q;
     if(k==="mock") startMock();
@@ -391,7 +393,7 @@ function renderQuiz(){
     <div class="progress"><i style="width:${pct(s.i+1,s.list.length)}%"></i></div>
     <div class="panel" style="margin-top:14px">
       <div class="qmeta"><span class="tag ${q.f}">${FIELD[q.f]}</span><span>${esc(q.g)}</span><span>・${esc(q.cat)}</span><span style="margin-left:auto">${src}</span></div>
-      <div class="stem">${qfmt(q.q, q)}</div>
+      <div class="stem">${stemHTML(q)}</div>
       <div class="choices">${q.c.map((c,i)=>{
         let cls=""; if(reveal){ if(i===q.a) cls="ok"; else if(i===chosen) cls="ng"; } else if(i===chosen) cls="sel";
         return `<button class="choice ${cls}" data-i="${i}" ${reveal?"disabled":""}><span class="k">${KANA[i]}</span><span>${qfmt(c, q)}</span></button>`; }).join("")}</div>
@@ -472,7 +474,7 @@ function renderResult(){
     <h2>全問題の振り返り</h2>
     <div class="list">${qs.map((q,i)=>{ const c=s.pick[q.id], good=c===q.a; return `
       <details class="item"><summary class="row"><b class="${good?"pass":"fail"}">${good?"○":"×"}</b><span>${i+1}. ${esc(q.title||q.q.slice(0,40))}</span><span class="small muted" style="margin-left:auto">${q.eid?esc(q.src)+" 問"+q.no:"新傾向"}</span></summary>
-        <div class="stem" style="margin-top:10px">${qfmt(q.q, q)}</div>
+        <div class="stem" style="margin-top:10px">${stemHTML(q)}</div>
         ${q.c.map((t,j)=>`<div class="small" style="margin:2px 0;${j===q.a?"color:var(--ok);font-weight:700":j===c?"color:var(--ng)":""}">${KANA[j]} ${qfmt(t, q)}${j===q.a?"（正解）":j===c?"（あなたの解答）":""}</div>`).join("")}
         ${c===undefined?`<div class="small fail">未解答</div>`:""}
         <div class="exp">${expHTML(q, "small")}</div>
@@ -807,6 +809,13 @@ document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState
    合言葉から PBKDF2 で鍵を作って復号し、成功したら合言葉をこの端末に保存する。 */
 let UNLOCKED = false;
 // 長い解説を読みやすく分ける：本文は2〜3文ごとに段落、「したがって…」の結論、「ア …」「イ，ウ …」の選択肢ごとの説明
+// 図や表をOCRで読めなかった問題は、IPAの問題冊子の該当部分の画像を出す（選択肢も画像の中）
+// 文字で出す問題も、OCRの読み違いや図の有無を原本で確かめられるようにする
+const stemHTML = q => {
+  const im = q.img ? `<a href="${q.img}" target="_blank" rel="noopener" title="タップで拡大"><img class="qimg" src="${q.img}" alt="${esc(q.src)} 問${q.no}" loading="lazy"></a>` : "";
+  if (q.io) return `${im}<span class="small muted">選択肢は画像の中のア〜エから選んでください（画像をタップすると拡大）</span>`;
+  return qfmt(q.q, q) + (im ? `<details class="qimgd"><summary>問題冊子の画像で確認</summary>${im}</details>` : "");
+};
 function expSplit(txt){
   const out = []; let depth = 0, last = 0;
   for (let i = 0; i < txt.length; i++){

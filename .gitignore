@@ -4,6 +4,7 @@
 AP科目A対策.html
 app_src/data/past.json
 app_src/data/autumn.json
+app_src/data/recent.json
 
 # 公開版の解説を暗号化する合言葉
 app_src/.passphrase

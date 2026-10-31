@@ -89,6 +89,17 @@ def main():
             qs.append({"id": x["id"], "src": x["exam"], "eid": x["eid"], "no": x["no"], "title": x["title"],
                        "cat": x["cat"], "g": x["g"], "f": x["field"],
                        "q": x["q"], "c": x["c"], "a": x["ans"], "e": x["exp"]})
+    # 令和4年春〜（IPA公開PDFのOCR＋解答例のみ。tools/parse_recent.py で生成）。図表で読めない問題は画像で出す
+    recent = SRC / "data/recent.json"
+    if recent.exists():
+        for x in json.loads(recent.read_text(encoding="utf-8")):
+            if not x["ok"]:
+                continue
+            img, only = x.get("img"), x.get("imgonly")
+            qs.append({"id": x["id"], "src": x["exam"], "eid": x["eid"], "no": x["no"], "title": x["title"] if not only or len(x["title"]) > 4 else f"{x['exam']} 問{x['no']}",
+                       "cat": x["cat"], "g": x["g"], "f": x["field"], "q": "" if only else x["q"], "c": ["", "", "", ""] if only else x["c"], "a": x["ans"],
+                       "e": [f"正解は{KANA[x['ans']]}（IPA公表の解答例）。この年度は解説がないので，詳しくは下の「サイトで原文・解説を見る」で確認してください。"],
+                       "free": 1, **({"img": img} if img else {}), **({"io": 1} if only else {})})
     # 目視確認による修正（data/corrections.json）：置換・差し替え・除外
     corr = json.loads((SRC / "data/corrections.json").read_text(encoding="utf-8"))
     for q in qs:
@@ -155,6 +166,8 @@ def build_public(data, tpl):
     pub = json.loads(json.dumps(data, ensure_ascii=False))
     hidden = {}
     for q in pub["questions"]:
+        if q.pop("free", 0):               # 解説が「正解は○」だけの問題は暗号化しない
+            continue
         if q["eid"]:                       # 過去問（解説が参考書・解説PDF由来）
             hidden[q["id"]] = q["e"]
             q["e"], q["lk"] = [], 1
