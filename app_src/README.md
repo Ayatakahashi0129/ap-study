@@ -30,6 +30,12 @@ Firebase コンソール（プロジェクト `ap-study-f809d`）で必要な設
 ## 過去問の解説（Firebase）
 参考書・解説PDF由来の解説（`bk` の付く問題）は公開版 `index.html` に入れない。ローカル版を `http://localhost:8765/AP科目A対策.html` で開いてログインし、記録画面の「Firebaseに保存」で Firestore の `exp/{eid}` に試験ごとに保存する。公開版はログインした本人（`firestore.rules` に書いた uid）だけが読める。データを直したら保存し直す。
 
+## 科目B（午後）
+- `tools/parse_pm.py` … IPA の午後問題冊子・解答例・採点講評（`応用情報/ipa_pm/`、Gitに入れない）から `data/pm.json` と問題冊子のページ画像 `img/pm/<試験ID>/<ページ>.webp` を作る。
+  問題の区切りは冊子のOCR（`ocr.ps1` → `応用情報/ipa_pm/ocr/`）で「問N」「…に関する次の記述を読んで」を探して決める。拾えなかった開始ページは `START_FIX`、崩れたテーマは `THEME_FIX` で直す
+- `tools/parse_pm_book.py` … 手持ちの参考書PDFから午後の解説を取り出して `data/pm_book.json`（Gitに入れない）に入れる。公開版では外し、Firebase の `exp/pm_<試験ID>` から本人だけが読む
+- `data/pm_exp.json` … 独自に書いた解説（令和4年〜）。`{問題id: [{"s": "設問1", "t": "本文（段落は改行）"}]}`。`s` が空の要素は問題全体の導入
+
 ## 問題やカードを追加したら
 ```
 python app_src/tools/build.py

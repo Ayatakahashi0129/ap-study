@@ -156,6 +156,14 @@ def main():
     guide = json.loads((SRC / "data/guide.json").read_text(encoding="utf-8"))
     pmf = SRC / "data/pm.json"   # 科目B（tools/parse_pm.py で作る）
     pm = json.loads(pmf.read_text(encoding="utf-8")) if pmf.exists() else []
+    # 科目Bの解説：参考書由来（pm_book.json、Gitに入れない。公開版では外す）と独自に書いたもの（pm_exp.json）
+    load = lambda name: json.loads((SRC / "data" / name).read_text(encoding="utf-8")) if (SRC / "data" / name).exists() else {}
+    pm_book, pm_exp = load("pm_book.json"), load("pm_exp.json")
+    for q in pm:
+        if q["id"] in pm_book:
+            q["ex"], q["bk"] = pm_book[q["id"]], 1
+        elif q["id"] in pm_exp:
+            q["ex"] = pm_exp[q["id"]]
     data = {"questions": qs, "cards": fc, "guide": guide, "pm": pm,"groups": {f: [g for g in GROUPS if any(q["g"] == g and q["f"] == f for q in qs)] for f in "TMS"}}
     js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     tpl = (SRC / "template.html").read_text(encoding="utf-8")
@@ -178,6 +186,10 @@ def build_public(data, tpl):
         q.pop("free", 0)
         if q.pop("bk", 0):
             q["e"], q["lk"] = [], 1
+            n += 1
+    for q in pub["pm"]:
+        if q.pop("bk", 0):
+            q.pop("ex", None); q["lk"] = 1
             n += 1
     pub["public"] = 1
 

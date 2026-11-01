@@ -900,7 +900,7 @@ function pmAnswerHTML(q){
     <div class="row" style="margin-top:14px">${r && r.done ? `<button class="btn" id="pmretry">解き直す</button><button class="btn primary" data-tab="e">解説を読む</button>` : `<button class="btn primary" id="pmgrade">採点する</button>`}</div>`;
 }
 function pmExpHTML(q){
-  const ex = q.ex && q.ex.length ? q.ex.map(x => (x.s ? `<h3>${esc(x.s)}</h3>` : "") + x.t.split(/\n+/).map(p=>`<p>${qfmt(p, q)}</p>`).join("")).join("")
+  const ex = q.ex && q.ex.length ? q.ex.map(x => (x.s ? `<h3>${esc(x.s)}</h3>` : "") + x.t.split(/\n+/).map(p=>`<p>${qfmt(p, q).replace(/^(（\d+）|空欄\s*[a-zA-Zア-ン]+|[ア-ン](?:[，,][ア-ン])*(?=[　 ]))/, "<b>$1</b> ")}</p>`).join("")).join("")
     : q.lk ? `<p class="muted">🔒 参考書の解説は、ログインすると表示されます。　${SYNC.user ? esc(EXP.msg || "読み込んでいます…") : `<a href="#" data-login>Googleでログイン</a>`}</p>`
     : `<p class="muted">この問題の詳しい解説はまだありません。解答例と出題趣旨・採点講評を参考にしてください。</p>`;
   return `<div class="callout key"><b>出題趣旨（IPA）</b>${esc(q.aim || "—")}</div>
@@ -925,7 +925,7 @@ function renderRecord(){
     ${DATA.public ? `<h2>過去問の解説</h2>
     <div class="panel"><span>${UNLOCKED ? "🔓 過去問の解説を表示中" : "🔒 過去問の解説は、下の「Googleでログインして同期」でログインすると表示されます（本人のアカウントのみ）"}</span>${EXP.msg?`<p class="small muted" style="margin-bottom:0">${esc(EXP.msg)}</p>`:""}</div>`
       : SYNC.user && BK.length ? `<h2>過去問の解説をFirebaseへ</h2>
-    <div class="panel row spread"><span class="small">参考書・解説PDF由来の解説 ${BK.length}問 を Firebase に保存し、公開版でログインしたときに表示します。データを直したら押し直してください。${EXP.msg?`<br>${esc(EXP.msg)}`:""}</span><button class="btn sm primary" id="expup">Firebaseに保存</button></div>` : ""}
+    <div class="panel row spread"><span class="small">参考書・解説PDF由来の解説（科目A ${BK.filter(q=>!q.ex).length}問・科目B ${BK.filter(q=>q.ex).length}問）を Firebase に保存し、公開版でログインしたときに表示します。データを直したら押し直してください。${EXP.msg?`<br>${esc(EXP.msg)}`:""}</span><button class="btn sm primary" id="expup">Firebaseに保存</button></div>` : ""}
     <h2>端末間の同期</h2>
     <div class="panel">
       ${!/^https?:$/.test(location.protocol) ? `<p class="small" style="margin:0">ログインして同期する機能は、Web版（GitHub Pages）で使えます。</p>`
@@ -1059,19 +1059,19 @@ document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState
    試験ごとに保存し（e: {問題id: 解説} のJSON文字列）、公開版でログインした本人だけが読む（firestore.rules）。 */
 let UNLOCKED = false;
 const EXP = { msg:"" };
-const BK = Q.filter(q=>q.bk);
+const BK = [...Q.filter(q=>q.bk), ...PM.filter(q=>q.bk)];   // 科目Bは q.ex（設問ごとの解説）を "pm_試験ID" の文書に入れる
 async function loadExp(){
-  if (UNLOCKED || !Q.some(q=>q.lk)) return;
+  if (UNLOCKED || !(Q.some(q=>q.lk) || PM.some(q=>q.lk))) return;
   try {
     const {F, db} = FB, snap = await F.getDocs(F.collection(db, "exp"));
-    snap.forEach(doc=>{ const m = JSON.parse(doc.data().e || "{}"); for (const id in m) if (QBY[id]) QBY[id].e = m[id]; });
+    snap.forEach(doc=>{ const m = JSON.parse(doc.data().e || "{}"); for (const id in m) { if (QBY[id]) QBY[id].e = m[id]; else if (PMBY[id]) PMBY[id].ex = m[id]; } });
     UNLOCKED = !snap.empty; EXP.msg = snap.empty ? "解説がまだFirebaseに保存されていません" : "";
   } catch(e) { EXP.msg = e.code==="permission-denied" ? "このアカウントでは過去問の解説を見られません" : "解説を読み込めませんでした："+fbErr(e); }
   render();
 }
 async function uploadExp(){
   const by = {};
-  for (const q of BK) (by[q.eid] = by[q.eid] || {})[q.id] = q.e;
+  for (const q of BK) { const k = q.ex ? "pm_"+q.eid : q.eid; (by[k] = by[k] || {})[q.id] = q.ex || q.e; }
   const ids = Object.keys(by);
   try {
     const {F, db} = FB, b = F.writeBatch(db);

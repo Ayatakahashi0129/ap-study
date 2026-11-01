@@ -12,3 +12,6 @@ app_src/.passphrase
 # ローカル設定・一時ファイル
 .claude/
 __pycache__/
+
+# 科目Bの参考書の解説（著作権あり）
+app_src/data/pm_book.json
