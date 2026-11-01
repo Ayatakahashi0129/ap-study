@@ -221,6 +221,19 @@ def comments(code):
     return res
 
 
+def skew_angle(im):
+    """スキャンの傾き（度）。回転させながら行ごとの黒画素数を数え、行と行間の差がいちばんはっきりする角度を選ぶ
+    （横書きの行が水平のとき、文字のある行と行間の差が最大になる）。粗く0.2°刻みで探し、その周りを0.02°刻みで詰める。"""
+    import numpy as np
+    small = ImageOps.invert(im.resize((800, round(im.height * 800 / im.width))))
+    def score(a):
+        p = np.asarray(small.rotate(a, resample=Image.BILINEAR, fillcolor=0), dtype=np.float32).sum(axis=1)
+        return float(((p[1:] - p[:-1]) ** 2).sum())
+    best = max((score(a), a) for a in np.arange(-3, 3.01, 0.2))
+    best = max([best] + [(score(a), a) for a in np.arange(best[1] - 0.2, best[1] + 0.21, 0.02)])
+    return round(float(best[1]), 2)
+
+
 def page_image(doc, pno, out, rotate=0):
     pg = doc[pno - 1]
     s = IMG_W * 1.15 / pg.rect.width
@@ -228,6 +241,10 @@ def page_image(doc, pno, out, rotate=0):
     im = Image.frombytes("L", (pix.width, pix.height), pix.samples)
     if rotate:
         im = im.rotate(rotate, expand=True, fillcolor=255)
+    # スキャンした冊子は少し傾いているので、文字の行が水平になるように回してから余白を切る
+    a = skew_angle(im)
+    if abs(a) >= 0.05:
+        im = im.rotate(a, resample=Image.BICUBIC, fillcolor=255)
     box = ImageOps.invert(im).point(lambda v: 255 if v > 40 else 0).getbbox()
     if box:
         pad = 24
