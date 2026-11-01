@@ -20,7 +20,12 @@
 - `tools/quality.py`・`tools/gt_sample.py`・`tools/ui_test.js` … 品質チェック、元PDF画像との見比べ用サンプル出力、ブラウザでの動作テスト（全問を解いて判定・表示を確認）
 
 ## 端末間の同期
-記録画面で GitHub の個人用アクセストークン（gist 権限のみ）を入れると、学習記録を非公開Gist `ap-study-progress.json` に保存し、同じトークンの端末どうしで自動的にマージする（解答は新しい方、カードは更新時刻が新しい方、履歴は和集合）。
+記録画面で Google ログインすると、学習記録を Firebase（Firestore）の `users/{uid}` 文書（`state` にJSON文字列、`pass` に合言葉）に保存し、同じアカウントの端末どうしで自動的にマージする（解答は新しい方、カードは更新時刻が新しい方、履歴は和集合）。他端末の書き込みは onSnapshot で即時に取り込む。
+
+Firebase コンソール（プロジェクト `ap-study-f809d`）で必要な設定：
+1. Authentication → ログイン方法 → Google を有効にする
+2. Authentication → 設定 → 承認済みドメイン に `ayatakahashi0129.github.io` を追加
+3. Firestore Database を作成し、ルールに `app_src/firestore.rules` の内容を貼って公開
 
 ## 問題やカードを追加したら
 ```

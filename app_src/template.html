@@ -728,10 +728,11 @@ function renderRecord(){
       ${UNLOCKED ? `<button class="btn sm" id="lockbtn">この端末から合言葉を消す</button>` : `<button class="btn sm primary" data-unlock>合言葉を入力</button>`}</div>` : ""}
     <h2>端末間の同期</h2>
     <div class="panel">
-      ${ghToken() ? `<div class="row spread"><span>🔄 同期中：${esc(SYNC.msg || "準備完了")}</span><span class="row"><button class="btn sm" id="syncnow">今すぐ同期</button><button class="btn sm ghost" id="syncoff">この端末の同期をやめる</button></span></div>`
-        : `<p class="small" style="margin-top:0">GitHubの<b>gist</b>権限だけを付けた個人用アクセストークンを入力すると、学習記録（解いた問題・カードの習得度・履歴）を自分の<b>非公開Gist</b>に保存し、同じトークンを入れた端末どうしで自動的に共有します。</p>
-           <div class="row"><input type="password" id="ghtoken" placeholder="ghp_… または github_pat_…" autocomplete="off" style="flex:1;min-width:200px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 10px"><button class="btn sm primary" id="syncsave">同期を始める</button></div>
-           <p class="small muted">トークンは github.com → Settings → Developer settings → Personal access tokens で作れます（必要な権限は gist だけ）。トークンはこの端末のブラウザ内にだけ保存されます。${SYNC.msg?`<br>${esc(SYNC.msg)}`:""}</p>`}
+      ${!/^https?:$/.test(location.protocol) ? `<p class="small" style="margin:0">ログインして同期する機能は、Web版（GitHub Pages）で使えます。</p>`
+        : SYNC.user ? `<div class="row spread"><span>🔄 ${esc(SYNC.user.email||"ログイン中")} で同期中：${esc(SYNC.msg || "準備完了")}</span><span class="row"><button class="btn sm" id="syncnow">今すぐ同期</button><button class="btn sm ghost" id="syncoff">ログアウト</button></span></div>`
+        : `<p class="small" style="margin-top:0">Googleアカウントでログインすると、学習記録（解いた問題・カードの習得度・履歴）をデータベース（Firebase）に保存し、同じアカウントでログインした端末どうしで自動的に共有します。記録を読み書きできるのは本人だけです。${DATA.locked?"合言葉もいっしょに保存されるので、2台目からはログインするだけで解説が見られます。":""}</p>
+           <div class="row"><button class="btn sm primary" id="syncsave">Googleでログインして同期</button></div>
+           ${SYNC.msg?`<p class="small muted">${esc(SYNC.msg)}</p>`:""}`}
     </div>
     <h2>データ</h2>
     <div class="panel row">
@@ -739,28 +740,86 @@ function renderRecord(){
       <label class="btn sm">記録を読み込む<input type="file" id="imp" accept="application/json" hidden></label>
       <button class="btn sm" id="rst" style="margin-left:auto;color:var(--ng)">すべての記録を消去</button>
     </div>
-    <p class="note">記録はこのブラウザのlocalStorageに保存されます。別のPCやブラウザに移すときは「書き出す」→「読み込む」を使ってください。</p>`;
+    <p class="note">記録はこのブラウザのlocalStorageにも保存されます。ログインしない端末へ移すときは「書き出す」→「読み込む」を使ってください。</p>`;
   $("#exp").onclick = ()=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"})); a.download=`ap-study-${new Date().toISOString().slice(0,10)}.json`; a.click(); };
   $("#imp").onchange = async e=>{ const f=e.target.files[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); S=Object.assign({ans:{},flag:{},box:{},hist:[]}, d); save(); alert("読み込みました"); renderRecord(); }catch(err){ alert("読み込めませんでした"); } };
   $("#rst").onclick = ()=>{ if(confirm("解答記録・カードの習得度・履歴をすべて消去します。よろしいですか？")){ S={ans:{},flag:{},box:{},hist:[],resetAt:Date.now()}; save(); CS=null; renderRecord(); } };
   // 同期中の画面には「同期を始める」ボタンが無いので、存在するボタンにだけ処理を付ける
-  if ($("#syncsave")) $("#syncsave").onclick = ()=>{ const t=$("#ghtoken").value.trim(); if(!t) return; try{ localStorage.setItem(KEY+"-gh", t); localStorage.removeItem(KEY+"-gist"); }catch(e){} syncNow(true); };
+  if ($("#syncsave")) $("#syncsave").onclick = fbLogin;
   if ($("#syncnow")) $("#syncnow").onclick = ()=>syncNow(true);
-  if ($("#syncoff")) $("#syncoff").onclick = ()=>{ try{ localStorage.removeItem(KEY+"-gh"); localStorage.removeItem(KEY+"-gist"); }catch(e){} SYNC.msg="同期をやめました（この端末のトークンを削除）"; renderRecord(); };
+  if ($("#syncoff")) $("#syncoff").onclick = fbLogout;
   if ($("#lockbtn")) $("#lockbtn").onclick = ()=>{ try{ localStorage.removeItem(KEY+"-pass"); }catch(e){} location.reload(); };
+  if (!FB && !FBP && !SYNC.failed && /^https?:$/.test(location.protocol)) fb().catch(e=>{ SYNC.failed = true; SYNC.msg = "同期の準備ができませんでした："+fbErr(e); renderRecord(); });
 }
 
-/* ---------- 端末間の同期（GitHub Gist） ----------
-   学習記録 S を、利用者のGitHubアカウントの非公開Gist（ファイル名 ap-study-progress.json）に保存し、
-   端末ごとの記録と項目単位でマージする：解答は新しい方、カードは更新時刻が新しい方、履歴は和集合。 */
-const SYNC = { msg:"", busy:false, timer:null };
-const GIST_FILE = "ap-study-progress.json";
-const ghToken = () => { try { return localStorage.getItem(KEY+"-gh"); } catch(e) { return null; } };
-function scheduleSync(){ if (!ghToken()) return; clearTimeout(SYNC.timer); SYNC.timer = setTimeout(()=>syncNow(false), 4000); }
-async function gh(path, opt={}){
-  const r = await fetch("https://api.github.com"+path, {...opt, headers:{"Authorization":"Bearer "+ghToken(), "Accept":"application/vnd.github+json", ...(opt.body?{"Content-Type":"application/json"}:{})}});
-  if (!r.ok) throw new Error(r.status===401 ? "トークンが無効です" : r.status===403||r.status===404 ? "トークンに gist 権限がありません" : "GitHub API エラー "+r.status);
-  return r.json();
+/* ---------- 端末間の同期（Firebase） ----------
+   Googleでログインすると、学習記録 S を Firestore の users/{uid} に保存し、同じアカウントの端末どうしで共有する。
+   端末ごとの記録とは項目単位でマージする：解答は新しい方、カードは更新時刻が新しい方、履歴は和集合。
+   本人以外が読み書きできないことは Firestore のセキュリティルール（app_src/firestore.rules）で保証する。
+   SDKは、ログインしたことのある端末だけで読み込む（KEY+"-fb" が目印）。 */
+const FB_CONFIG = {
+  apiKey: "AIzaSyAFUrUWY7sVyFd_oE-U7c6Su2h4-PmxRn8",
+  authDomain: "ap-study-f809d.firebaseapp.com",
+  projectId: "ap-study-f809d",
+  storageBucket: "ap-study-f809d.firebasestorage.app",
+  messagingSenderId: "644639577731",
+  appId: "1:644639577731:web:312b0fc4d882f5d080edb6",
+};
+const FB_SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
+const SYNC = { msg:"", busy:false, timer:null, user:null, unsub:null };
+let FB = null, FBP = null;
+const fb = () => FBP || (FBP = fbInit().catch(e=>{ FBP = null; throw e; }));
+async function fbInit(){
+  const [app, A, F] = await Promise.all(["firebase-app","firebase-auth","firebase-firestore"].map(m=>import(FB_SDK+m+".js")));
+  const a = app.initializeApp(FB_CONFIG);
+  FB = { auth:A.getAuth(a), db:F.getFirestore(a), A, F };
+  A.onAuthStateChanged(FB.auth, u=>{
+    SYNC.user = u; if (SYNC.unsub) { SYNC.unsub(); SYNC.unsub = null; }
+    if (u) {
+      // 別の端末で書き込まれたら、すぐこの端末の記録にも取り込む
+      SYNC.unsub = F.onSnapshot(userDoc(), snap=>{ if (!snap.metadata.hasPendingWrites) adoptRemote(snap.data()||{}); }, e=>{ SYNC.msg = "同期できませんでした："+fbErr(e); if (view==="record") renderRecord(); });
+      syncNow(false);
+    }
+    if (view==="record") renderRecord();
+  });
+  return FB;
+}
+const userDoc = () => FB.F.doc(FB.db, "users", SYNC.user.uid);
+const fbErr = e => ({
+  "auth/unauthorized-domain":"このサイトのドメインがFirebaseで許可されていません（Authentication → 設定 → 承認済みドメイン）",
+  "auth/popup-closed-by-user":"ログインを中止しました",
+  "auth/operation-not-allowed":"FirebaseでGoogleログインが有効になっていません",
+  "permission-denied":"データベースの読み書きが許可されていません（Firestoreのルールを確認）",
+  "unavailable":"オフラインです（あとで自動的に同期します）",
+}[e.code] || e.code || e.message);
+const remoteState = d => { try { return d.state ? JSON.parse(d.state) : null; } catch(e) { return null; } };
+// データベースの記録をこの端末の記録にマージする（書き込みはしない）
+function adoptRemote(d){
+  const r = remoteState(d);
+  if (r) {
+    const merged = mergeState(S, r);
+    if (JSON.stringify(merged) !== JSON.stringify(S)) {
+      S = merged; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {}
+      if (view==="home" || view==="record") render();
+    }
+  }
+  // 合言葉も本人のデータとして保存してあるので、未入力の端末ではそれで解説を開ける
+  if (DATA.locked && !UNLOCKED && d.pass) unlock(d.pass).then(()=>{ try{ localStorage.setItem(KEY+"-pass", d.pass); }catch(e){} render(); }).catch(()=>{});
+}
+function scheduleSync(){ if (!SYNC.user) return; clearTimeout(SYNC.timer); SYNC.timer = setTimeout(()=>syncNow(false), 3000); }
+// スマホのブラウザはタップの直後でないとポップアップを開かせないので、SDKは記録画面を開いた時点で読み込んでおく
+function fbLogin(){
+  if (!FB) { SYNC.msg = "準備しています。少し待ってからもう一度押してください"; renderRecord(); return; }
+  try { localStorage.setItem(KEY+"-fb", "1"); } catch(e) {}
+  const {A, auth} = FB, p = new A.GoogleAuthProvider();
+  A.signInWithPopup(auth, p)
+    .catch(e => { if (e.code==="auth/popup-blocked" || e.code==="auth/operation-not-supported-in-this-environment") return A.signInWithRedirect(auth, p); throw e; })
+    .catch(e => { SYNC.msg = "ログインできませんでした："+fbErr(e); renderRecord(); });
+}
+async function fbLogout(){
+  try { localStorage.removeItem(KEY+"-fb"); } catch(e) {}
+  if (FB) await FB.A.signOut(FB.auth);
+  SYNC.msg = "ログアウトしました（この端末の記録はそのまま残ります）"; renderRecord();
 }
 function mergeState(a, b){
   const reset = Math.max(a.resetAt||0, b.resetAt||0), newer = (x,y)=>((x&&x.t)||0) >= ((y&&y.t)||0) ? x : y;
@@ -776,30 +835,21 @@ function mergeState(a, b){
   return out;
 }
 async function syncNow(manual){
-  if (!ghToken() || SYNC.busy) return;
+  if (!SYNC.user || SYNC.busy) return;
   SYNC.busy = true; if (manual) { SYNC.msg = "同期しています…"; if (view==="record") renderRecord(); }
   try {
-    let id = null; try { id = localStorage.getItem(KEY+"-gist"); } catch(e) {}
-    if (!id) {   // 既存のGistを探す（別の端末で作られていればそれを使う）
-      const list = await gh("/gists?per_page=100");
-      id = list.find(g => g.files && g.files[GIST_FILE])?.id || null;
-    }
-    let remote = { ans:{}, flag:{}, box:{}, hist:[] };
-    if (id) {
-      const g = await gh("/gists/"+id);
-      const f = g.files[GIST_FILE];
-      const text = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
-      try { remote = JSON.parse(text); } catch(e) {}
-    }
-    const merged = mergeState(S, remote);
-    const body = JSON.stringify({ description:"応用情報 科目A対策 の学習記録（自動同期）", files:{ [GIST_FILE]:{ content: JSON.stringify(merged) } } });
-    if (id) await gh("/gists/"+id, {method:"PATCH", body});
-    else { const g = await gh("/gists", {method:"POST", body: JSON.stringify({...JSON.parse(body), public:false})}); id = g.id; }
-    try { localStorage.setItem(KEY+"-gist", id); localStorage.setItem(KEY, JSON.stringify(merged)); } catch(e) {}
-    S = merged;
+    const {F} = FB, ref = userDoc(), snap = await F.getDoc(ref), d = snap.exists() ? snap.data() : {};
+    const merged = mergeState(S, remoteState(d) || {ans:{}, flag:{}, box:{}, hist:[]}), text = JSON.stringify(merged);
+    let pass = null; try { pass = localStorage.getItem(KEY+"-pass"); } catch(e) {}
+    const up = {};
+    if (text !== d.state) up.state = text;
+    if (UNLOCKED && pass && pass !== d.pass) up.pass = pass;
+    if (Object.keys(up).length) await F.setDoc(ref, {...up, updatedAt:F.serverTimestamp()}, {merge:true});
+    S = merged; try { localStorage.setItem(KEY, text); } catch(e) {}
+    if (DATA.locked && !UNLOCKED && d.pass) adoptRemote({pass:d.pass});
     SYNC.msg = `${new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})} に同期しました（解いた問題 ${Object.keys(S.ans).length}問）`;
     if (view==="home" || view==="record") render();
-  } catch(e) { SYNC.msg = "同期できませんでした：" + e.message; if (view==="record") renderRecord(); }
+  } catch(e) { SYNC.msg = "同期できませんでした：" + fbErr(e); if (view==="record") renderRecord(); }
   SYNC.busy = false;
 }
 document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible") syncNow(false); });
@@ -873,14 +923,17 @@ document.addEventListener("click", async e=>{
   const a = e.target.closest("[data-unlock]"); if (!a) return;
   e.preventDefault(); e.stopPropagation();
   const pass = prompt("合言葉を入力してください"); if (!pass) return;
-  try { await unlock(pass.trim()); try{ localStorage.setItem(KEY+"-pass", pass.trim()); }catch(err){} render(); }
+  try { await unlock(pass.trim()); try{ localStorage.setItem(KEY+"-pass", pass.trim()); }catch(err){} render(); syncNow(false); }
   catch(err){ alert("合言葉が違います"); }
 }, true);
 
 (async ()=>{
   if (DATA.locked) { let p=null; try{ p=localStorage.getItem(KEY+"-pass"); }catch(e){} if (p) { try { await unlock(p); } catch(e){} } }
   render();
-  syncNow(false);
+  // 旧方式（GitHub Gist）の設定は使わなくなったので消す。記録そのものはこの端末に残っている
+  try { localStorage.removeItem(KEY+"-gh"); localStorage.removeItem(KEY+"-gist"); } catch(e) {}
+  let on = null; try { on = localStorage.getItem(KEY+"-fb"); } catch(e) {}
+  if (on && /^https?:$/.test(location.protocol)) fb().catch(e=>{ SYNC.msg = "同期の準備ができませんでした："+fbErr(e); });
 })();
 </script>
 </body>
