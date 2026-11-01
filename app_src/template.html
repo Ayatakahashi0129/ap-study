@@ -283,6 +283,8 @@ $("#nav").addEventListener("click", e=>{ const b=e.target.closest("button"); if(
   go(b.dataset.v); });
 function render(){
   document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current", b.dataset.v===view || (view==="quiz"&&b.dataset.v==="setup") || (view==="result"&&b.dataset.v==="setup") || (view==="pmq"&&b.dataset.v==="pm")));
+  // 前の画面が #app に付けたイベント処理を外す（残っていると、別の画面の操作で前の画面が描き直される）
+  const app = $("#app"); app.onclick = app.onchange = app.oninput = null;
   ({home:renderHome, setup:renderSetup, quiz:renderQuiz, result:renderResult, guide:renderGuide, cards:renderCards, gloss:renderGloss, record:renderRecord, pm:renderPm, pmq:renderPmQ})[view]();
 }
 $("#hdr-sub").textContent = `科目A ${Q.length}問／科目B ${(DATA.pm||[]).length}問／カード${CARDS.length}語`;
@@ -781,7 +783,9 @@ function pmFieldStats(){
 }
 
 function renderPm(){
-  const list = PM.filter(q => (!PSET.field || q.field === PSET.field) && (!PSET.exam || q.src === PSET.exam)
+  // 年度の絞り込み：個々の試験のほか、「令和」「平成」でまとめて選べる
+  const examOK = q => !PSET.exam || (PSET.exam === "令和" || PSET.exam === "平成" ? q.src.startsWith(PSET.exam) : q.src === PSET.exam);
+  const list = PM.filter(q => (!PSET.field || q.field === PSET.field) && examOK(q)
     && (PSET.st === "all" || (PSET.st === "new" ? !S.pm[q.id] : PSET.st === "done" ? pmScore(q) : S.pm[q.id] && !pmScore(q))));
   const done = PM.map(pmScore).filter(Boolean);
   $("#app").innerHTML = `
@@ -795,7 +799,7 @@ function renderPm(){
     <div class="panel">
       <div class="row" style="margin-bottom:10px"><label class="chip ${!PSET.field?"on":""}"><input type="radio" name="pf" value="" ${!PSET.field?"checked":""} hidden>すべての分野</label>${PM_FIELDS.map(f=>`<label class="chip ${PSET.field===f?"on":""}"><input type="radio" name="pf" value="${esc(f)}" ${PSET.field===f?"checked":""} hidden>${esc(f)}</label>`).join("")}</div>
       <div class="row">
-        <select id="pexam"><option value="">すべての年度</option>${PM_EXAMS.map(x=>`<option ${PSET.exam===x?"selected":""}>${esc(x)}</option>`).join("")}</select>
+        <select id="pexam"><option value="">すべての年度</option>${[["令和","令和のみ（元年秋〜7年秋）"],["平成","平成のみ（25年春〜31年春）"]].map(([v,l])=>`<option value="${v}" ${PSET.exam===v?"selected":""}>${l}</option>`).join("")}<optgroup label="試験ごと">${PM_EXAMS.map(x=>`<option ${PSET.exam===x?"selected":""}>${esc(x)}</option>`).join("")}</optgroup></select>
         <span class="seg">${[["all","すべて"],["new","未着手"],["doing","解答中"],["done","採点済み"]].map(([v,l])=>`<label><input type="radio" name="pst" value="${v}" ${PSET.st===v?"checked":""}>${l}</label>`).join("")}</span>
       </div>
     </div>
@@ -807,7 +811,7 @@ function renderPm(){
     if (t.name === "pf") PSET.field = t.value;
     if (t.name === "pst") PSET.st = t.value;
     if (t.id === "pexam") PSET.exam = t.value;
-    pmPersist(); renderPm();
+    if (t.name === "pf" || t.name === "pst" || t.id === "pexam") { pmPersist(); renderPm(); }
   };
   $("#app").onclick = e => { const b = e.target.closest("[data-pm]"); if (b) openPm(b.dataset.pm); };
 }
