@@ -149,6 +149,10 @@ def main():
                    "q": x["q"], "c": x["c"], "a": x["ans"], "e": x["exp"]})
     fc = [{"g": g, "f": f, "t": t, "d": d} for g, f, t, d in cards]
 
+    # 参考書・解説PDF由来の解説を持つ過去問（公開版では外し、Firebaseから本人だけが読む）
+    for q in qs:
+        if q["eid"] and not q.get("free"):
+            q["bk"] = 1
     guide = json.loads((SRC / "data/guide.json").read_text(encoding="utf-8"))
     data = {"questions": qs, "cards": fc, "guide": guide,"groups": {f: [g for g in GROUPS if any(q["g"] == g and q["f"] == f for q in qs)] for f in "TMS"}}
     js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
@@ -164,40 +168,21 @@ def main():
 
 def build_public(data, tpl):
     """GitHub Pages 用の公開版（リポジトリ直下の index.html）を作る。
-    過去問の解説は参考書・解説PDFの文章なので、合言葉から作った鍵で AES-GCM 暗号化して埋め込む。
-    合言葉は app_src/.passphrase（Gitに入れない）に置く。無ければランダムに作る。"""
-    import base64, hashlib, os, secrets
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-    pf = SRC / ".passphrase"
-    if not pf.exists():
-        alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
-        pf.write_text("-".join("".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(4)), encoding="utf-8")
-        print("合言葉を新しく作りました:", pf)
-    # アプリ側の normPass と同じ規則でそろえる（全角→半角、各種ハイフン→「-」、空白除去）。BOM付き保存にも対応
-    import unicodedata
-    passphrase = unicodedata.normalize("NFKC", pf.read_text(encoding="utf-8-sig"))
-    passphrase = re.sub(r"\s+", "", re.sub("[‐‑‒–—―−ーｰ－﹣]", "-", passphrase))
-
+    過去問の解説は参考書・解説PDFの文章なので公開版には入れない。
+    ローカル版の記録画面から Firestore の exp/{eid} に保存し、ログインした本人だけが読む（firestore.rules）。"""
     pub = json.loads(json.dumps(data, ensure_ascii=False))
-    hidden = {}
+    n = 0
     for q in pub["questions"]:
-        if q.pop("free", 0):               # 解説が「正解は○」だけの問題は暗号化しない
-            continue
-        if q["eid"]:                       # 過去問（解説が参考書・解説PDF由来）
-            hidden[q["id"]] = q["e"]
+        q.pop("free", 0)
+        if q.pop("bk", 0):
             q["e"], q["lk"] = [], 1
-    salt, iv, iters = os.urandom(16), os.urandom(12), 600_000
-    key = hashlib.pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, iters, dklen=32)
-    ct = AESGCM(key).encrypt(iv, json.dumps(hidden, ensure_ascii=False).encode("utf-8"), None)
-    b64 = lambda b: base64.b64encode(b).decode("ascii")
-    pub["locked"] = {"salt": b64(salt), "iv": b64(iv), "iter": iters, "ct": b64(ct)}
+            n += 1
     pub["public"] = 1
 
     js = json.dumps(pub, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     out = ROOT / "index.html"
     out.write_text(tpl.replace("/*__DATA__*/null", js), encoding="utf-8")
-    print("公開版:", out, f"({out.stat().st_size // 1024} KB, 暗号化した解説 {len(hidden)}問)")
+    print("公開版:", out, f"({out.stat().st_size // 1024} KB, Firebaseから読む解説 {n}問)")
 
 
 if __name__ == "__main__":

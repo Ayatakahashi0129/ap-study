@@ -723,14 +723,15 @@ function renderRecord(){
     <div class="panel bars">${exams.map(x=>`<div class="barrow"><div>${esc(x.x)}</div><div class="track"><i style="width:${pct(x.n,x.tot)}%;background:var(--accent)"></i></div><div class="n">${x.n}/${x.tot}</div></div>`).join("")}</div>
     <h2>テスト履歴</h2>
     <div class="list">${S.hist.length? S.hist.map(h=>`<div class="item row spread"><span>${new Date(h.t).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}　${esc(h.title)}</span><b class="${pct(h.ok,h.n)>=60?"pass":"fail"}">${h.ok}/${h.n}（${pct(h.ok,h.n)}%）</b></div>`).join("") : `<div class="empty">まだ履歴がありません</div>`}</div>
-    ${DATA.locked ? `<h2>過去問の解説</h2>
-    <div class="panel row spread"><span>${UNLOCKED ? "🔓 合言葉を入力済み（過去問の解説を表示中）" : "🔒 過去問の解説は合言葉を入力すると表示されます"}</span>
-      ${UNLOCKED ? `<button class="btn sm" id="lockbtn">この端末から合言葉を消す</button>` : `<button class="btn sm primary" data-unlock>合言葉を入力</button>`}</div>` : ""}
+    ${DATA.public ? `<h2>過去問の解説</h2>
+    <div class="panel"><span>${UNLOCKED ? "🔓 過去問の解説を表示中" : "🔒 過去問の解説は、下の「Googleでログインして同期」でログインすると表示されます（本人のアカウントのみ）"}</span>${EXP.msg?`<p class="small muted" style="margin-bottom:0">${esc(EXP.msg)}</p>`:""}</div>`
+      : SYNC.user && BK.length ? `<h2>過去問の解説をFirebaseへ</h2>
+    <div class="panel row spread"><span class="small">参考書・解説PDF由来の解説 ${BK.length}問 を Firebase に保存し、公開版でログインしたときに表示します。データを直したら押し直してください。${EXP.msg?`<br>${esc(EXP.msg)}`:""}</span><button class="btn sm primary" id="expup">Firebaseに保存</button></div>` : ""}
     <h2>端末間の同期</h2>
     <div class="panel">
       ${!/^https?:$/.test(location.protocol) ? `<p class="small" style="margin:0">ログインして同期する機能は、Web版（GitHub Pages）で使えます。</p>`
         : SYNC.user ? `<div class="row spread"><span>🔄 ${esc(SYNC.user.email||"ログイン中")} で同期中：${esc(SYNC.msg || "準備完了")}</span><span class="row"><button class="btn sm" id="syncnow">今すぐ同期</button><button class="btn sm ghost" id="syncoff">ログアウト</button></span></div>`
-        : `<p class="small" style="margin-top:0">Googleアカウントでログインすると、学習記録（解いた問題・カードの習得度・履歴）をデータベース（Firebase）に保存し、同じアカウントでログインした端末どうしで自動的に共有します。記録を読み書きできるのは本人だけです。${DATA.locked?"合言葉もいっしょに保存されるので、2台目からはログインするだけで解説が見られます。":""}</p>
+        : `<p class="small" style="margin-top:0">Googleアカウントでログインすると、学習記録（解いた問題・カードの習得度・履歴）をデータベース（Firebase）に保存し、同じアカウントでログインした端末どうしで自動的に共有します。記録を読み書きできるのは本人だけです。</p>
            <div class="row"><button class="btn sm primary" id="syncsave">Googleでログインして同期</button></div>
            ${SYNC.msg?`<p class="small muted">${esc(SYNC.msg)}</p>`:""}`}
     </div>
@@ -748,7 +749,7 @@ function renderRecord(){
   if ($("#syncsave")) $("#syncsave").onclick = fbLogin;
   if ($("#syncnow")) $("#syncnow").onclick = ()=>syncNow(true);
   if ($("#syncoff")) $("#syncoff").onclick = fbLogout;
-  if ($("#lockbtn")) $("#lockbtn").onclick = ()=>{ try{ localStorage.removeItem(KEY+"-pass"); }catch(e){} location.reload(); };
+  if ($("#expup")) $("#expup").onclick = uploadExp;
   if (!FB && !FBP && !SYNC.failed && /^https?:$/.test(location.protocol)) fb().catch(e=>{ SYNC.failed = true; SYNC.msg = "同期の準備ができませんでした："+fbErr(e); renderRecord(); });
 }
 
@@ -772,13 +773,16 @@ const fb = () => FBP || (FBP = fbInit().catch(e=>{ FBP = null; throw e; }));
 async function fbInit(){
   const [app, A, F] = await Promise.all(["firebase-app","firebase-auth","firebase-firestore"].map(m=>import(FB_SDK+m+".js")));
   const a = app.initializeApp(FB_CONFIG);
-  FB = { auth:A.getAuth(a), db:F.getFirestore(a), A, F };
+  // 読んだ文書（解説など）をこの端末に保存しておき、オフラインでも表示できるようにする
+  let db; try { db = F.initializeFirestore(a, {localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})}); } catch(e) { db = F.getFirestore(a); }
+  FB = { auth:A.getAuth(a), db, A, F };
   A.onAuthStateChanged(FB.auth, u=>{
     SYNC.user = u; if (SYNC.unsub) { SYNC.unsub(); SYNC.unsub = null; }
     if (u) {
       // 別の端末で書き込まれたら、すぐこの端末の記録にも取り込む
       SYNC.unsub = F.onSnapshot(userDoc(), snap=>{ if (!snap.metadata.hasPendingWrites) adoptRemote(snap.data()||{}); }, e=>{ SYNC.msg = "同期できませんでした："+fbErr(e); if (view==="record") renderRecord(); });
       syncNow(false);
+      if (DATA.public) loadExp();
     }
     if (view==="record") renderRecord();
   });
@@ -803,18 +807,16 @@ function adoptRemote(d){
       if (view==="home" || view==="record") render();
     }
   }
-  // 合言葉も本人のデータとして保存してあるので、未入力の端末ではそれで解説を開ける
-  if (DATA.locked && !UNLOCKED && d.pass) unlock(d.pass).then(()=>{ try{ localStorage.setItem(KEY+"-pass", d.pass); }catch(e){} render(); }).catch(()=>{});
 }
 function scheduleSync(){ if (!SYNC.user) return; clearTimeout(SYNC.timer); SYNC.timer = setTimeout(()=>syncNow(false), 3000); }
-// スマホのブラウザはタップの直後でないとポップアップを開かせないので、SDKは記録画面を開いた時点で読み込んでおく
+// スマホのブラウザはタップの直後でないとポップアップを開かせないので、SDKは公開版なら起動時、ローカル版なら記録画面を開いた時点で読み込んでおく
 function fbLogin(){
-  if (!FB) { SYNC.msg = "準備しています。少し待ってからもう一度押してください"; renderRecord(); return; }
+  if (!FB) { alert(SYNC.failed ? SYNC.msg : "準備しています。少し待ってからもう一度押してください"); return; }
   try { localStorage.setItem(KEY+"-fb", "1"); } catch(e) {}
   const {A, auth} = FB, p = new A.GoogleAuthProvider();
   A.signInWithPopup(auth, p)
     .catch(e => { if (e.code==="auth/popup-blocked" || e.code==="auth/operation-not-supported-in-this-environment") return A.signInWithRedirect(auth, p); throw e; })
-    .catch(e => { SYNC.msg = "ログインできませんでした："+fbErr(e); renderRecord(); });
+    .catch(e => { SYNC.msg = "ログインできませんでした："+fbErr(e); if (view==="record") renderRecord(); else alert(SYNC.msg); });
 }
 async function fbLogout(){
   try { localStorage.removeItem(KEY+"-fb"); } catch(e) {}
@@ -840,13 +842,11 @@ async function syncNow(manual){
   try {
     const {F} = FB, ref = userDoc(), snap = await F.getDoc(ref), d = snap.exists() ? snap.data() : {};
     const merged = mergeState(S, remoteState(d) || {ans:{}, flag:{}, box:{}, hist:[]}), text = JSON.stringify(merged);
-    let pass = null; try { pass = localStorage.getItem(KEY+"-pass"); } catch(e) {}
     const up = {};
     if (text !== d.state) up.state = text;
-    if (UNLOCKED && pass && pass !== d.pass) up.pass = pass;
+    if ("pass" in d) up.pass = F.deleteField();   // 合言葉方式の名残を消す
     if (Object.keys(up).length) await F.setDoc(ref, {...up, updatedAt:F.serverTimestamp()}, {merge:true});
     S = merged; try { localStorage.setItem(KEY, text); } catch(e) {}
-    if (DATA.locked && !UNLOCKED && d.pass) adoptRemote({pass:d.pass});
     SYNC.msg = `${new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})} に同期しました（解いた問題 ${Object.keys(S.ans).length}問）`;
     if (view==="home" || view==="record") render();
   } catch(e) { SYNC.msg = "同期できませんでした：" + fbErr(e); if (view==="record") renderRecord(); }
@@ -854,10 +854,34 @@ async function syncNow(manual){
 }
 document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible") syncNow(false); });
 
-/* ---------- 公開版：過去問の解説の合言葉ロック ----------
-   公開版（GitHub Pages）では、参考書・解説PDF由来の解説を AES-GCM で暗号化して埋め込んでいる。
-   合言葉から PBKDF2 で鍵を作って復号し、成功したら合言葉をこの端末に保存する。 */
+/* ---------- 過去問の解説（Firebase） ----------
+   参考書・解説PDF由来の解説（q.bk）は公開版に入れない。ローカル版から Firestore の exp/{eid} に
+   試験ごとに保存し（e: {問題id: 解説} のJSON文字列）、公開版でログインした本人だけが読む（firestore.rules）。 */
 let UNLOCKED = false;
+const EXP = { msg:"" };
+const BK = Q.filter(q=>q.bk);
+async function loadExp(){
+  if (UNLOCKED || !Q.some(q=>q.lk)) return;
+  try {
+    const {F, db} = FB, snap = await F.getDocs(F.collection(db, "exp"));
+    snap.forEach(doc=>{ const m = JSON.parse(doc.data().e || "{}"); for (const id in m) if (QBY[id]) QBY[id].e = m[id]; });
+    UNLOCKED = !snap.empty; EXP.msg = snap.empty ? "解説がまだFirebaseに保存されていません" : "";
+  } catch(e) { EXP.msg = e.code==="permission-denied" ? "このアカウントでは過去問の解説を見られません" : "解説を読み込めませんでした："+fbErr(e); }
+  render();
+}
+async function uploadExp(){
+  const by = {};
+  for (const q of BK) (by[q.eid] = by[q.eid] || {})[q.id] = q.e;
+  const ids = Object.keys(by);
+  try {
+    const {F, db} = FB, b = F.writeBatch(db);
+    for (const eid of ids) b.set(F.doc(db, "exp", eid), {e: JSON.stringify(by[eid]), n: Object.keys(by[eid]).length, updatedAt: F.serverTimestamp()});
+    EXP.msg = "保存しています…"; renderRecord();
+    await b.commit();
+    EXP.msg = `${BK.length}問の解説を${ids.length}件に分けて保存しました`;
+  } catch(e) { EXP.msg = "保存できませんでした："+fbErr(e); }
+  renderRecord();
+}
 // 長い解説を読みやすく分ける：本文は2〜3文ごとに段落、「したがって…」の結論、「ア …」「イ，ウ …」の選択肢ごとの説明
 // 図や表をOCRで読めなかった問題は、IPAの問題冊子の該当部分の画像を出す（選択肢も画像の中）
 // 文字で出す問題も、OCRの読み違いや図の有無を原本で確かめられるようにする
@@ -904,36 +928,21 @@ function expHTML(q, cls){
     }
     return head + (seg ? expSentences(seg).map(p=>`<p class="${cls}">${qfmt(p, q)}</p>`).join("") : "");
   }).join("");
-  if (q.lk) return `<p class="${cls} muted">🔒 この問題の解説は合言葉を入力すると表示されます。　<a href="#" data-unlock>合言葉を入力</a></p>`;
+  if (q.lk) return `<p class="${cls} muted">🔒 この問題の解説はログインすると表示されます。　${SYNC.user ? esc(EXP.msg || "読み込んでいます…") : `<a href="#" data-login>Googleでログイン</a>`}</p>`;
   return "";
 }
-// スマホの日本語キーボードで入りやすい全角文字・別のハイフン記号・空白を、そろえてから使う（build.py と同じ規則）
-const normPass = p => String(p).normalize("NFKC").replace(/[‐‑‒–—―−ーｰ－﹣]/g, "-").replace(/\s+/g, "");
-async function unlock(pass){
-  const L = DATA.locked, b = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
-  pass = normPass(pass);
-  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
-  const key = await crypto.subtle.deriveKey({name:"PBKDF2", salt:b(L.salt), iterations:L.iter, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
-  const plain = await crypto.subtle.decrypt({name:"AES-GCM", iv:b(L.iv)}, key, b(L.ct));   // 合言葉が違うとここで失敗する
-  const m = JSON.parse(new TextDecoder().decode(plain));
-  for (const id in m) if (QBY[id]) QBY[id].e = m[id];
-  UNLOCKED = true;
-}
-document.addEventListener("click", async e=>{
-  const a = e.target.closest("[data-unlock]"); if (!a) return;
+document.addEventListener("click", e=>{
+  const a = e.target.closest("[data-login]"); if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  const pass = prompt("合言葉を入力してください"); if (!pass) return;
-  try { await unlock(pass.trim()); try{ localStorage.setItem(KEY+"-pass", pass.trim()); }catch(err){} render(); syncNow(false); }
-  catch(err){ alert("合言葉が違います"); }
+  fbLogin();
 }, true);
 
-(async ()=>{
-  if (DATA.locked) { let p=null; try{ p=localStorage.getItem(KEY+"-pass"); }catch(e){} if (p) { try { await unlock(p); } catch(e){} } }
+(()=>{
   render();
-  // 旧方式（GitHub Gist）の設定は使わなくなったので消す。記録そのものはこの端末に残っている
-  try { localStorage.removeItem(KEY+"-gh"); localStorage.removeItem(KEY+"-gist"); } catch(e) {}
+  // 旧方式（GitHub Gist・合言葉）の設定は使わなくなったので消す。記録そのものはこの端末に残っている
+  try { for (const k of ["-gh","-gist","-pass"]) localStorage.removeItem(KEY+k); } catch(e) {}
   let on = null; try { on = localStorage.getItem(KEY+"-fb"); } catch(e) {}
-  if (on && /^https?:$/.test(location.protocol)) fb().catch(e=>{ SYNC.msg = "同期の準備ができませんでした："+fbErr(e); });
+  if ((on || DATA.public) && /^https?:$/.test(location.protocol)) fb().catch(e=>{ SYNC.failed = true; SYNC.msg = "同期の準備ができませんでした："+fbErr(e); });
 })();
 </script>
 </body>

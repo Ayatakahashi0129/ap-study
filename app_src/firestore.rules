@@ -1,9 +1,13 @@
 rules_version = '2';
-// 学習記録は users/{uid} の1文書。ログインした本人だけが自分の文書を読み書きできる
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 学習記録は users/{uid} の1文書。ログインした本人だけが自分の文書を読み書きできる
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    // 参考書・解説PDF由来の過去問の解説（試験ごとに1文書）。作者のアカウントだけが読み書きできる
+    match /exp/{eid} {
+      allow read, write: if request.auth != null && request.auth.uid == "Zbs5IX7k9bSavi7E0OwobNQHqkH3";
     }
   }
 }

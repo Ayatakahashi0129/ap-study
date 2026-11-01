@@ -20,12 +20,15 @@
 - `tools/quality.py`・`tools/gt_sample.py`・`tools/ui_test.js` … 品質チェック、元PDF画像との見比べ用サンプル出力、ブラウザでの動作テスト（全問を解いて判定・表示を確認）
 
 ## 端末間の同期
-記録画面で Google ログインすると、学習記録を Firebase（Firestore）の `users/{uid}` 文書（`state` にJSON文字列、`pass` に合言葉）に保存し、同じアカウントの端末どうしで自動的にマージする（解答は新しい方、カードは更新時刻が新しい方、履歴は和集合）。他端末の書き込みは onSnapshot で即時に取り込む。
+記録画面で Google ログインすると、学習記録を Firebase（Firestore）の `users/{uid}` 文書（`state` にJSON文字列）に保存し、同じアカウントの端末どうしで自動的にマージする（解答は新しい方、カードは更新時刻が新しい方、履歴は和集合）。他端末の書き込みは onSnapshot で即時に取り込む。
 
 Firebase コンソール（プロジェクト `ap-study-f809d`）で必要な設定：
 1. Authentication → ログイン方法 → Google を有効にする
 2. Authentication → 設定 → 承認済みドメイン に `ayatakahashi0129.github.io` を追加
 3. Firestore Database を作成し、ルールに `app_src/firestore.rules` の内容を貼って公開
+
+## 過去問の解説（Firebase）
+参考書・解説PDF由来の解説（`bk` の付く問題）は公開版 `index.html` に入れない。ローカル版を `http://localhost:8765/AP科目A対策.html` で開いてログインし、記録画面の「Firebaseに保存」で Firestore の `exp/{eid}` に試験ごとに保存する。公開版はログインした本人（`firestore.rules` に書いた uid）だけが読める。データを直したら保存し直す。
 
 ## 問題やカードを追加したら
 ```
