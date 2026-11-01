@@ -158,7 +158,9 @@ def main():
     pm = json.loads(pmf.read_text(encoding="utf-8")) if pmf.exists() else []
     # 科目Bの解説：参考書由来（pm_book.json、Gitに入れない。公開版では外す）と独自に書いたもの（pm_exp.json）
     load = lambda name: json.loads((SRC / "data" / name).read_text(encoding="utf-8")) if (SRC / "data" / name).exists() else {}
-    pm_book, pm_exp = load("pm_book.json"), load("pm_exp.json")
+    pm_book, pm_exp = load("pm_book.json"), {}
+    for f in sorted((SRC / "data" / "pm_exp").glob("*.json")):   # 年度ごとのファイル（例：pm_exp/04_haru.json）
+        pm_exp.update(json.loads(f.read_text(encoding="utf-8")))
     for q in pm:
         if q["id"] in pm_book:
             q["ex"], q["bk"] = pm_book[q["id"]], 1
