@@ -76,8 +76,11 @@ def segment(code, pages):
     starts, memo = set(), set()
     for p in pages:
         ls = sorted(p["lines"], key=lambda l: l["y"])
-        allt = re.sub(r"[\W_]", "", "".join(line_text(l) for l in ls))
-        if allt in ("", "メモ用紙") or ("メモ用紙" in allt and len(ls) <= 4):
+        allt = re.sub(r"[\W_\d]", "", "".join(line_text(l) for l in ls))
+        # メモ用紙（OCRで「〔メ」「モ用紙〕」に分かれて逆順に読まれることがある）と、冊子末尾の注意事項のページは問題に含めない
+        if allt == "" or sorted(allt) == sorted("メモ用紙") or ("メモ用紙" in allt and len(ls) <= 4):
+            memo.add(p["page"])
+        if "退室可能時間" in allt or ("試験終了後" in allt and "答案用紙" in allt):
             memo.add(p["page"])
         top = " ".join(line_text(l) for l in ls if l["y"] < 700)
         if "問題一覧" in top:
