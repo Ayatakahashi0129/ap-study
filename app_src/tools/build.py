@@ -154,7 +154,9 @@ def main():
         if q["eid"] and not q.get("free"):
             q["bk"] = 1
     guide = json.loads((SRC / "data/guide.json").read_text(encoding="utf-8"))
-    data = {"questions": qs, "cards": fc, "guide": guide,"groups": {f: [g for g in GROUPS if any(q["g"] == g and q["f"] == f for q in qs)] for f in "TMS"}}
+    pmf = SRC / "data/pm.json"   # 科目B（tools/parse_pm.py で作る）
+    pm = json.loads(pmf.read_text(encoding="utf-8")) if pmf.exists() else []
+    data = {"questions": qs, "cards": fc, "guide": guide, "pm": pm,"groups": {f: [g for g in GROUPS if any(q["g"] == g and q["f"] == f for q in qs)] for f in "TMS"}}
     js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     tpl = (SRC / "template.html").read_text(encoding="utf-8")
     out = ROOT / "AP科目A対策.html"

@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="AP科目A">
+<meta name="apple-mobile-web-app-title" content="AP対策">
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Math&display=swap">
-<title>応用情報 科目A対策</title>
+<title>応用情報 科目A・B対策</title>
 <style>
 :root{
   --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2433; --muted:#667085; --line:#e4e7ec;
@@ -185,6 +185,34 @@ a{color:var(--accent)}
 .gsec{margin:22px 0 8px;font-size:.95rem;color:var(--muted);display:flex;gap:8px;align-items:center}
 .glinks{margin-top:10px;font-size:.9rem}
 .glinks a{cursor:pointer;margin-right:12px}
+/* 科目B */
+.pmimg{display:block;width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:8px;margin:0 0 10px}
+.pmtabs{position:sticky;top:var(--hdr,56px);z-index:4;background:var(--bg);padding:8px 0;margin-bottom:8px}
+.pmlist .item{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
+.pmlist .item:hover{border-color:var(--accent)}
+.pmlist .th{grid-column:1;font-weight:600}
+.pmlist .st{grid-row:1 / span 2;grid-column:2;font-size:.85rem;color:var(--muted);text-align:right;white-space:nowrap}
+.pmlist .meta{grid-column:1;font-size:.82rem;color:var(--muted)}
+.ans-s{margin:18px 0 6px;font-weight:700}
+.ansrow{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 8px;background:var(--panel)}
+.ansrow .lb{font-size:.85rem;color:var(--muted);margin-bottom:6px}
+.ansrow .lb b{color:var(--ink)}
+.ansrow textarea,.ansrow input[type=text]{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;font:inherit;resize:vertical}
+.kchips{display:flex;flex-wrap:wrap;gap:6px}
+.kchips button{min-width:38px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-weight:700}
+.kchips button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.kchips button:disabled{cursor:default}
+.cnt{font-size:.78rem;color:var(--muted);text-align:right}
+.model{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--ok-soft);font-size:.95rem}
+.model b{color:var(--ok);font-size:.8rem;display:block}
+.ansrow.ok{border-color:var(--ok)} .ansrow.ng{border-color:var(--ng)} .ansrow.half{border-color:var(--warn)}
+.grade{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;font-size:.85rem}
+.grade button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 12px;cursor:pointer;font-weight:700}
+.grade button.on[data-g="1"]{background:var(--ok);border-color:var(--ok);color:var(--panel)}
+.grade button.on[data-g="0.5"]{background:var(--warn);border-color:var(--warn);color:var(--panel)}
+.grade button.on[data-g="0"]{background:var(--ng);border-color:var(--ng);color:var(--panel)}
+.pmexp p{margin:.5em 0}
+.pmexp h3{font-size:.98rem;margin:1.2em 0 .3em}
 @media (max-width:560px){
   .brand small,.kbd{display:none}
   nav button{padding:4px 10px}
@@ -196,10 +224,11 @@ a{color:var(--accent)}
 <body>
 <header>
   <div class="bar">
-    <div class="brand">応用情報 科目A対策<small id="hdr-sub"></small></div>
+    <div class="brand">応用情報 科目A・B対策<small id="hdr-sub"></small></div>
     <nav id="nav">
       <button data-v="home">ホーム</button>
       <button data-v="setup">テスト</button>
+      <button data-v="pm">科目B</button>
       <button data-v="guide">要点解説</button>
       <button data-v="cards">暗記カード</button>
       <button data-v="gloss">用語集</button>
@@ -235,7 +264,7 @@ const pct = (a,b) => b? Math.round(a*100/b) : 0;
 
 /* ---------- 保存（このブラウザだけに保存） ---------- */
 const KEY = "apA-study-v1";
-let S = { ans:{}, flag:{}, box:{}, hist:[] };
+let S = { ans:{}, flag:{}, box:{}, hist:[], pm:{} };
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch(e) {}
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} scheduleSync(); }
 function record(q, ok){
@@ -248,15 +277,15 @@ const isWeak = id => { const r=S.ans[id]; return r && (r.last===0 || (r.n>=2 && 
 
 /* ---------- ルーティング ---------- */
 let view = "home", session = null, timerId = null;
-function go(v){ view=v; if(v!=="quiz") stopTimer(); render(); window.scrollTo(0,0); }
+function go(v){ view=v; if(v!=="quiz") stopTimer(); if(v!=="pmq") clearInterval(PMT); render(); window.scrollTo(0,0); }
 $("#nav").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return;
   if (view==="quiz" && session && !session.finished && !confirm("テストを中断しますか？（解答済みの記録は残ります）")) return;
   go(b.dataset.v); });
 function render(){
-  document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current", b.dataset.v===view || (view==="quiz"&&b.dataset.v==="setup") || (view==="result"&&b.dataset.v==="setup")));
-  ({home:renderHome, setup:renderSetup, quiz:renderQuiz, result:renderResult, guide:renderGuide, cards:renderCards, gloss:renderGloss, record:renderRecord})[view]();
+  document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current", b.dataset.v===view || (view==="quiz"&&b.dataset.v==="setup") || (view==="result"&&b.dataset.v==="setup") || (view==="pmq"&&b.dataset.v==="pm")));
+  ({home:renderHome, setup:renderSetup, quiz:renderQuiz, result:renderResult, guide:renderGuide, cards:renderCards, gloss:renderGloss, record:renderRecord, pm:renderPm, pmq:renderPmQ})[view]();
 }
-$("#hdr-sub").textContent = `過去問${Q.filter(q=>q.eid).length}問＋新傾向${Q.filter(q=>!q.eid).length}問／カード${CARDS.length}語`;
+$("#hdr-sub").textContent = `科目A ${Q.length}問／科目B ${(DATA.pm||[]).length}問／カード${CARDS.length}語`;
 
 /* ---------- ホーム ---------- */
 function stats(list){
@@ -281,6 +310,7 @@ function renderHome(){
       <button class="btn big" data-q="rand20"><b>ランダム20問</b><span>即時に正誤と解説を表示</span></button>
       <button class="btn big" data-q="new"><b>新傾向オリジナル問題</b><span>生成AI・ゼロトラスト・SBOMなど令和4〜7年度の頻出テーマ</span></button>
       <button class="btn big" data-q="weak" ${weak?"":"disabled"}><b>苦手を復習（${weak}問）</b><span>間違えた問題・正答率60%未満の問題</span></button>
+      <button class="btn big" data-q="pm"><b>科目B（午後）の過去問</b><span>平成25年〜令和7年の${(DATA.pm||[]).length}問。選択式は自動採点、記述式は解答例で自己採点</span></button>
       <button class="btn big" data-q="guide"><b>要点解説で弱点を補強</b><span>間違えやすい用語を比較表とひっかけポイントで整理</span></button>
       <button class="btn big" data-q="cards"><b>暗記カードで用語を覚える</b><span>「覚えた」を3回で習得扱い</span></button>
       <button class="btn big" data-q="setup"><b>条件を指定して出題</b><span>年度・分野・問題数・モードを選択</span></button>
@@ -297,6 +327,7 @@ function renderHome(){
     if(k==="weak") startQuiz(shuffle(Q.filter(q=>isWeak(q.id))), {mode:"study", title:"苦手の復習"});
     if(k==="cards") go("cards");
     if(k==="guide") go("guide");
+    if(k==="pm") go("pm");
     if(k==="setup") go("setup");
   };
 }
@@ -712,6 +743,172 @@ function renderGloss(){
 }
 
 /* ---------- 記録 ---------- */
+/* ---------- 科目B（午後） ----------
+   問題文は IPA の問題冊子のページ画像（q.img）。解答用紙は解答例の表（q.rows：設問・小問・空欄・解答例・備考）から作る。
+   ア〜の記号だけの解答は選択式として自動採点し、記述は解答例と見比べて ○（1）・△（0.5）・×（0）を自分で付ける。
+   記録は S.pm[問題id] = { t:更新時刻, a:{行番号:解答}, g:{行番号:点}, done:採点済みか }。 */
+const PM = DATA.pm || [], PMBY = Object.fromEntries(PM.map(q=>[q.id,q]));
+const PM_FIELDS = ["情報セキュリティ","経営戦略","情報戦略","プログラミング","システムアーキテクチャ","ネットワーク","データベース","組込みシステム開発","情報システム開発","プロジェクトマネジメント","サービスマネジメント","システム監査"].filter(f=>PM.some(q=>q.field===f));
+const PM_EXAMS = [...new Set(PM.map(q=>q.src))];
+let PSET = { field:"", exam:"", st:"all", cur:null, tab:"q" };
+try { Object.assign(PSET, JSON.parse(localStorage.getItem(KEY+"-pm")||"{}")); } catch(e) {}
+const pmPersist = () => { try { localStorage.setItem(KEY+"-pm", JSON.stringify(PSET)); } catch(e) {} };
+let PMT = null, PM_T0 = 0;
+const KATA = "アイウエオカキクケコサシスセソタチツテト".split("");
+const isChoice = a => /^[ア-ン](\s*[,，、]\s*[ア-ン])*$/.test(a);
+const choiceSet = a => a.split(/\s*[,，、]\s*/).filter(Boolean).sort().join(",");
+// 記述の自動判定用：全角半角・空白・句読点・括弧の違いを無視して比べる（「又は」で並んだ別解のどれかと一致すれば正解）
+const normA = s => String(s).normalize("NFKC").replace(/[\s,，、。．.・「」『』()（）]/g, "").toLowerCase();
+const autoOK = (row, v) => isChoice(row.a) ? choiceSet(v||"") === choiceSet(row.a)
+  : !!v && row.a.split(/\s*又は\s*/).some(x => normA(x) === normA(v));
+function pmScore(q){
+  const r = S.pm[q.id]; if (!r || !r.done || !q.rows.length) return null;
+  const graded = q.rows.filter((_, i) => r.g[i] != null).length;
+  const sum = q.rows.reduce((s, _, i) => s + (r.g[i] || 0), 0);
+  return { pct: pct(sum, q.rows.length), left: q.rows.length - graded };
+}
+function pmStatus(q){
+  const r = S.pm[q.id]; if (!r) return "未着手";
+  const sc = pmScore(q);
+  if (!sc) return "解答中";
+  return `${sc.pct}点${sc.left ? `（未採点${sc.left}）` : ""}`;
+}
+function pmFieldStats(){
+  return PM_FIELDS.map(f => {
+    const l = PM.filter(q => q.field === f), sc = l.map(pmScore).filter(Boolean);
+    return { f, tot: l.length, n: sc.length, avg: sc.length ? Math.round(sc.reduce((s, x) => s + x.pct, 0) / sc.length) : 0 };
+  });
+}
+
+function renderPm(){
+  const list = PM.filter(q => (!PSET.field || q.field === PSET.field) && (!PSET.exam || q.src === PSET.exam)
+    && (PSET.st === "all" || (PSET.st === "new" ? !S.pm[q.id] : PSET.st === "done" ? pmScore(q) : S.pm[q.id] && !pmScore(q))));
+  const done = PM.map(pmScore).filter(Boolean);
+  $("#app").innerHTML = `
+    <h1>科目B（午後）</h1>
+    <div class="grid g3">
+      <div class="panel stat"><div class="v">${done.length}<span class="small muted"> / ${PM.length}</span></div><div class="k">採点した問題</div></div>
+      <div class="panel stat"><div class="v">${done.length ? Math.round(done.reduce((s,x)=>s+x.pct,0)/done.length) : 0}点</div><div class="k">平均点（1問100点換算）</div></div>
+      <div class="panel stat"><div class="v">${PM.filter(q=>S.pm[q.id] && !pmScore(q)).length}</div><div class="k">解答中</div></div>
+    </div>
+    <p class="small muted">本番は150分で、問1（情報セキュリティ）が必須、問2〜11から4問を選びます。1問あたり30分が目安です。問題文は問題冊子の画像で、選択式は自動採点、記述式は解答例と見比べて自己採点します。</p>
+    <div class="panel">
+      <div class="row" style="margin-bottom:10px"><label class="chip ${!PSET.field?"on":""}"><input type="radio" name="pf" value="" ${!PSET.field?"checked":""} hidden>すべての分野</label>${PM_FIELDS.map(f=>`<label class="chip ${PSET.field===f?"on":""}"><input type="radio" name="pf" value="${esc(f)}" ${PSET.field===f?"checked":""} hidden>${esc(f)}</label>`).join("")}</div>
+      <div class="row">
+        <select id="pexam"><option value="">すべての年度</option>${PM_EXAMS.map(x=>`<option ${PSET.exam===x?"selected":""}>${esc(x)}</option>`).join("")}</select>
+        <span class="seg">${[["all","すべて"],["new","未着手"],["doing","解答中"],["done","採点済み"]].map(([v,l])=>`<label><input type="radio" name="pst" value="${v}" ${PSET.st===v?"checked":""}>${l}</label>`).join("")}</span>
+      </div>
+    </div>
+    <h2>${list.length}問</h2>
+    <div class="list pmlist">${list.map(q=>`<button class="item" data-pm="${q.id}"><span class="th">${esc(q.theme)}</span><span class="st">${pmStatus(q)}</span><span class="meta">${esc(q.src)} 問${q.no}・${esc(q.field)}・${esc(q.sel)}</span></button>`).join("") || `<div class="empty">条件に合う問題がありません</div>`}</div>
+    <p class="note">出典：独立行政法人情報処理推進機構（IPA）応用情報技術者試験 午後問題・解答例・出題趣旨・採点講評（平成25年春期〜令和7年秋期）。</p>`;
+  $("#app").onchange = e => {
+    const t = e.target;
+    if (t.name === "pf") PSET.field = t.value;
+    if (t.name === "pst") PSET.st = t.value;
+    if (t.id === "pexam") PSET.exam = t.value;
+    pmPersist(); renderPm();
+  };
+  $("#app").onclick = e => { const b = e.target.closest("[data-pm]"); if (b) openPm(b.dataset.pm); };
+}
+function openPm(id){ PSET.cur = id; PSET.tab = "q"; pmPersist(); PM_T0 = Date.now(); go("pmq"); }
+
+function pmRowsHTML(q){
+  const r = S.pm[q.id] || {a:{}, g:{}}, done = !!r.done;
+  // 解答群の記号は冊子で確かめる必要があるので、ア〜クを基本にし、それより後ろの記号が答えにある問題だけ広げる
+  const maxK = Math.max(7, ...q.rows.filter(x=>isChoice(x.a)).flatMap(x=>x.a.split(/\s*[,，、]\s*/)).map(k=>KATA.indexOf(k)));
+  let last = "";
+  return q.rows.map((row, i) => {
+    const head = row.s !== last ? `<div class="ans-s">${esc(row.s || "解答")}</div>` : ""; last = row.s;
+    const lb = [row.sub, row.k ? `<b>${esc(row.k.replace(/\n/g, ""))}</b>` : ""].filter(Boolean).join(" ") || "解答";
+    const v = r.a[i] || "", g = r.g[i];
+    let input;
+    if (isChoice(row.a)) {
+      const on = new Set(v.split(",").filter(Boolean));
+      input = `<div class="kchips">${KATA.slice(0, maxK + 1).map(k=>`<button data-k="${k}" data-i="${i}" class="${on.has(k)?"on":""}" ${done?"disabled":""}>${k}</button>`).join("")}</div>`;
+    } else {
+      const long = row.a.length > 14;
+      input = long ? `<textarea data-i="${i}" rows="2" ${done?"readonly":""}>${esc(v)}</textarea><div class="cnt">${[...v].length}字</div>`
+                   : `<input type="text" data-i="${i}" value="${esc(v)}" ${done?"readonly":""}>`;
+    }
+    let res = "", cls = "";
+    if (done) {
+      cls = g === 1 ? " ok" : g === 0.5 ? " half" : g === 0 ? " ng" : "";
+      res = `<div class="model"><b>解答例${row.note ? `（${esc(row.note)}）` : ""}</b>${esc(row.a)}</div>`
+        + (isChoice(row.a) ? `<div class="grade">${g === 1 ? "○ 正解" : "× 不正解"}</div>`
+           : `<div class="grade">${autoOK(row, v) ? "○ 解答例と一致" : `<span class="muted">自己採点：</span>${[["1","○"],["0.5","△"],["0","×"]].map(([x,l])=>`<button data-g="${x}" data-i="${i}" class="${g===+x?"on":""}">${l}</button>`).join("")}`}</div>`);
+    }
+    return `${head}<div class="ansrow${cls}"><div class="lb">${lb}</div>${input}${res}</div>`;
+  }).join("");
+}
+function renderPmQ(){
+  const q = PMBY[PSET.cur]; if (!q) { go("pm"); return; }
+  const r = S.pm[q.id], sc = pmScore(q), tab = PSET.tab;
+  const i = PM.indexOf(q), prev = PM[i-1], next = PM[i+1];
+  $("#app").innerHTML = `
+    <div class="qmeta"><a href="#" data-back>← 一覧</a><span>${esc(q.src)} 問${q.no}</span><span class="tag S">${esc(q.field)}</span><span>${esc(q.sel)}</span><span class="timer" id="pmt" style="margin-left:auto"></span></div>
+    <h1 style="margin-bottom:.3em">${esc(q.theme)}</h1>
+    <div class="pmtabs"><span class="seg">${[["q","問題文"],["a","解答"],["e","解説"]].map(([v,l])=>`<label><input type="radio" name="ptab" value="${v}" ${tab===v?"checked":""}>${l}</label>`).join("")}</span>
+      ${sc ? `<b style="margin-left:10px">${sc.pct}点</b>${sc.left?`<span class="small muted">（記述 ${sc.left}件を自己採点してください）</span>`:""}` : ""}</div>
+    <div id="pmbody">${tab === "q" ? pmProblemHTML(q) : tab === "a" ? pmAnswerHTML(q) : pmExpHTML(q)}</div>
+    <div class="navq">${prev ? `<button class="btn sm" data-pm="${prev.id}">← ${esc(prev.src)} 問${prev.no}</button>` : "<span></span>"}${next ? `<button class="btn sm" data-pm="${next.id}">${esc(next.src)} 問${next.no} →</button>` : ""}</div>`;
+  const hdr = document.querySelector("header"); if (hdr) document.documentElement.style.setProperty("--hdr", hdr.offsetHeight + "px");
+  clearInterval(PMT);
+  const tick = () => { const el = $("#pmt"); if (!el) return; const s = Math.floor((Date.now() - PM_T0) / 1000); el.textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; el.style.color = s > 1800 ? "var(--ng)" : ""; };
+  tick(); PMT = setInterval(tick, 1000);
+  const app = $("#app");
+  app.onchange = e => { if (e.target.name === "ptab") { PSET.tab = e.target.value; pmPersist(); renderPmQ(); } };
+  app.oninput = e => {
+    const t = e.target; if (t.dataset.i == null || t.readOnly) return;
+    const rec = S.pm[q.id] = S.pm[q.id] || {a:{}, g:{}};
+    rec.a[t.dataset.i] = t.value; rec.t = Date.now(); save();
+    const c = t.nextElementSibling; if (c && c.classList.contains("cnt")) c.textContent = `${[...t.value].length}字`;
+  };
+  app.onclick = e => {
+    const t = e.target;
+    if (t.closest("[data-back]")) { e.preventDefault(); go("pm"); return; }
+    const pmb = t.closest("[data-pm]"); if (pmb) { openPm(pmb.dataset.pm); return; }
+    const rec = () => (S.pm[q.id] = S.pm[q.id] || {a:{}, g:{}});
+    if (t.dataset.k) {   // 記号の選択（もう一度押すと外れる。複数選ぶ設問にも対応）
+      const x = rec(), on = new Set((x.a[t.dataset.i]||"").split(",").filter(Boolean));
+      on.has(t.dataset.k) ? on.delete(t.dataset.k) : on.add(t.dataset.k);
+      x.a[t.dataset.i] = [...on].sort().join(","); x.t = Date.now(); save();
+      t.classList.toggle("on"); return;
+    }
+    if (t.dataset.g != null && t.closest(".grade")) { const x = rec(); x.g[t.dataset.i] = +t.dataset.g; x.t = Date.now(); save(); renderPmQ(); return; }
+    if (t.dataset.tab) { PSET.tab = t.dataset.tab; pmPersist(); renderPmQ(); window.scrollTo(0,0); return; }
+    if (t.id === "pmgrade") {
+      const x = rec(); x.done = true; x.t = Date.now();
+      // 選択式・解答例と一致した記述・未記入は自動で採点し、残りの記述だけ自己採点にする
+      q.rows.forEach((row, i) => { const v = (x.a[i]||"").trim(); if (isChoice(row.a) || !v || autoOK(row, v)) x.g[i] = autoOK(row, v) ? 1 : 0; });
+      save(); renderPmQ(); return;
+    }
+    if (t.id === "pmretry" && confirm("この問題の解答と採点を消して、解き直しますか？")) { S.pm[q.id] = {a:{}, g:{}, t:Date.now()}; save(); PM_T0 = Date.now(); renderPmQ(); return; }
+  };
+}
+function pmProblemHTML(q){
+  const img = (src, alt) => `<a href="${src}" target="_blank" rel="noopener"><img class="pmimg" src="${src}" alt="${esc(alt)}" loading="lazy"></a>`;
+  return (q.errata ? `<details class="item" open><summary>⚠ 正誤表（この問題に訂正があります）</summary>${img(q.errata, "正誤表")}</details><br>` : "")
+    + q.img.map((s, i) => img(s, `${q.src} 問${q.no} ${i+1}ページ目`)).join("")
+    + (q.ref ? `<details class="item"><summary>擬似言語の記述形式（冊子の巻頭ページ）</summary>${q.ref.map(s=>img(s, "擬似言語の記述形式")).join("")}</details>` : "")
+    + `<p class="small muted">画像をタップすると拡大できます。読み終えたら「解答」タブへ。</p>`;
+}
+function pmAnswerHTML(q){
+  const r = S.pm[q.id];
+  return `<p class="small muted" style="margin-top:0">${r && r.done ? "解答例と見比べて、記述式は ○（同じ趣旨）・△（一部）・×（違う）を付けてください。" : "選択式は記号をタップ（もう一度で解除）。解答群の記号は問題文の画像で確かめてください。字数制限は問題文に従ってください。"}</p>
+    ${pmRowsHTML(q)}
+    <div class="row" style="margin-top:14px">${r && r.done ? `<button class="btn" id="pmretry">解き直す</button><button class="btn primary" data-tab="e">解説を読む</button>` : `<button class="btn primary" id="pmgrade">採点する</button>`}</div>`;
+}
+function pmExpHTML(q){
+  const ex = q.ex && q.ex.length ? q.ex.map(x => (x.s ? `<h3>${esc(x.s)}</h3>` : "") + x.t.split(/\n+/).map(p=>`<p>${qfmt(p, q)}</p>`).join("")).join("")
+    : q.lk ? `<p class="muted">🔒 参考書の解説は、ログインすると表示されます。　${SYNC.user ? esc(EXP.msg || "読み込んでいます…") : `<a href="#" data-login>Googleでログイン</a>`}</p>`
+    : `<p class="muted">この問題の詳しい解説はまだありません。解答例と出題趣旨・採点講評を参考にしてください。</p>`;
+  return `<div class="callout key"><b>出題趣旨（IPA）</b>${esc(q.aim || "—")}</div>
+    <div class="pmexp">${ex}</div>
+    ${q.cmnt ? `<div class="callout tip"><b>採点講評（IPA）</b>${q.cmnt.split(/\n+/).map(esc).join("<br>")}</div>` : ""}
+    <h3>解答例</h3><div class="list">${q.rows.map(r=>`<div class="item small"><b>${esc([r.s, r.sub, r.k.replace(/\n/g,"")].filter(Boolean).join(" "))}</b>　${esc(r.a)}${r.note?`<span class="muted">（${esc(r.note)}）</span>`:""}</div>`).join("")}</div>`;
+}
+
 function renderRecord(){
   const exams = EXAMS.map(x=>{ const l=Q.filter(q=>q.src===x), st=stats(l); return {x, tot:l.length, ...st}; });
   const groups = ["T","M","S"].flatMap(f=>DATA.groups[f].map(g=>{ const l=Q.filter(q=>q.g===g), st=stats(l); return {g,f,tot:l.length,...st}; }));
@@ -719,6 +916,8 @@ function renderRecord(){
     <h1>学習記録</h1>
     <h2>分類別の正答率</h2>
     <div class="panel bars">${groups.map(x=>bar(`${x.g}`, x.c, x.n, `var(--${x.f})`)).join("")}</div>
+    ${PM.length ? `<h2>科目B 分野別の平均点</h2>
+    <div class="panel bars">${pmFieldStats().map(x=>`<div class="barrow"><div>${esc(x.f)} <span class="small muted">${x.n}/${x.tot}問</span></div><div class="track"><i style="width:${x.avg}%;background:var(--S)"></i></div><div class="n">${x.n?x.avg+"点":"—"}</div></div>`).join("")}</div>` : ""}
     <h2>出典別の進み具合</h2>
     <div class="panel bars">${exams.map(x=>`<div class="barrow"><div>${esc(x.x)}</div><div class="track"><i style="width:${pct(x.n,x.tot)}%;background:var(--accent)"></i></div><div class="n">${x.n}/${x.tot}</div></div>`).join("")}</div>
     <h2>テスト履歴</h2>
@@ -743,8 +942,8 @@ function renderRecord(){
     </div>
     <p class="note">記録はこのブラウザのlocalStorageにも保存されます。ログインしない端末へ移すときは「書き出す」→「読み込む」を使ってください。</p>`;
   $("#exp").onclick = ()=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"})); a.download=`ap-study-${new Date().toISOString().slice(0,10)}.json`; a.click(); };
-  $("#imp").onchange = async e=>{ const f=e.target.files[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); S=Object.assign({ans:{},flag:{},box:{},hist:[]}, d); save(); alert("読み込みました"); renderRecord(); }catch(err){ alert("読み込めませんでした"); } };
-  $("#rst").onclick = ()=>{ if(confirm("解答記録・カードの習得度・履歴をすべて消去します。よろしいですか？")){ S={ans:{},flag:{},box:{},hist:[],resetAt:Date.now()}; save(); CS=null; renderRecord(); } };
+  $("#imp").onchange = async e=>{ const f=e.target.files[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); S=Object.assign({ans:{},flag:{},box:{},hist:[],pm:{}}, d); save(); alert("読み込みました"); renderRecord(); }catch(err){ alert("読み込めませんでした"); } };
+  $("#rst").onclick = ()=>{ if(confirm("解答記録・カードの習得度・履歴をすべて消去します。よろしいですか？")){ S={ans:{},flag:{},box:{},hist:[],pm:{},resetAt:Date.now()}; save(); CS=null; renderRecord(); } };
   // 同期中の画面には「同期を始める」ボタンが無いので、存在するボタンにだけ処理を付ける
   if ($("#syncsave")) $("#syncsave").onclick = fbLogin;
   if ($("#syncnow")) $("#syncnow").onclick = ()=>syncNow(true);
@@ -825,7 +1024,8 @@ async function fbLogout(){
 }
 function mergeState(a, b){
   const reset = Math.max(a.resetAt||0, b.resetAt||0), newer = (x,y)=>((x&&x.t)||0) >= ((y&&y.t)||0) ? x : y;
-  const out = { ans:{}, flag:{...b.flag, ...a.flag}, box:{}, boxT:{}, hist:[], resetAt:reset };
+  const out = { ans:{}, flag:{...b.flag, ...a.flag}, box:{}, boxT:{}, hist:[], pm:{}, resetAt:reset };
+  for (const id of new Set([...Object.keys(a.pm||{}), ...Object.keys(b.pm||{})])) { const r = newer(a.pm?.[id], b.pm?.[id]); if (r && (r.t||0) >= reset) out.pm[id] = r; }
   for (const id of new Set([...Object.keys(a.ans||{}), ...Object.keys(b.ans||{})])) { const r = newer(a.ans?.[id], b.ans?.[id]); if (r && (r.t||0) >= reset) out.ans[id] = r; }
   for (const k of new Set([...Object.keys(a.box||{}), ...Object.keys(b.box||{})])) {
     const ta = a.boxT?.[k]||0, tb = b.boxT?.[k]||0, src = ta >= tb ? a : b, t = Math.max(ta, tb);
