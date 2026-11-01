@@ -212,6 +212,9 @@ a{color:var(--accent)}
 .grade button.on[data-g="0.5"]{background:var(--warn);border-color:var(--warn);color:var(--panel)}
 .grade button.on[data-g="0"]{background:var(--ng);border-color:var(--ng);color:var(--panel)}
 .pmexp p{margin:.5em 0}
+main.pmwide{max-width:1500px}
+.pmsplit{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
+#pmleft{position:sticky;top:calc(var(--hdr,56px) + 58px);max-height:calc(100vh - var(--hdr,56px) - 70px);overflow-y:auto;padding-right:8px;overscroll-behavior:contain}
 .pmexp h3{font-size:.98rem;margin:1.2em 0 .3em}
 @media (max-width:560px){
   .brand small,.kbd{display:none}
@@ -285,6 +288,7 @@ function render(){
   document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current", b.dataset.v===view || (view==="quiz"&&b.dataset.v==="setup") || (view==="result"&&b.dataset.v==="setup") || (view==="pmq"&&b.dataset.v==="pm")));
   // 前の画面が #app に付けたイベント処理を外す（残っていると、別の画面の操作で前の画面が描き直される）
   const app = $("#app"); app.onclick = app.onchange = app.oninput = null;
+  if (view !== "pmq") app.classList.remove("pmwide");
   ({home:renderHome, setup:renderSetup, quiz:renderQuiz, result:renderResult, guide:renderGuide, cards:renderCards, gloss:renderGloss, record:renderRecord, pm:renderPm, pmq:renderPmQ})[view]();
 }
 $("#hdr-sub").textContent = `科目A ${Q.length}問／科目B ${(DATA.pm||[]).length}問／カード${CARDS.length}語`;
@@ -845,18 +849,28 @@ function pmRowsHTML(q){
     return `${head}<div class="ansrow${cls}"><div class="lb">${lb}</div>${input}${res}</div>`;
   }).join("");
 }
+// PCの幅では問題文（左）と解答・解説（右）を並べる。スマホはタブで切り替える
+const PM_WIDE = window.matchMedia("(min-width: 1000px)");
+PM_WIDE.addEventListener("change", () => { if (view === "pmq") renderPmQ(); });
 function renderPmQ(){
   const q = PMBY[PSET.cur]; if (!q) { go("pm"); return; }
-  const r = S.pm[q.id], sc = pmScore(q), tab = PSET.tab;
+  const wide = PM_WIDE.matches;
+  const r = S.pm[q.id], sc = pmScore(q), tab = wide && PSET.tab === "q" ? "a" : PSET.tab;
   const i = PM.indexOf(q), prev = PM[i-1], next = PM[i+1];
+  // 採点などで描き直しても、問題文を読んでいた位置を保つ
+  const keep = $("#pmleft") && $("#pmleft").dataset.q === q.id ? $("#pmleft").scrollTop : 0;
+  const side = tab === "e" ? pmExpHTML(q) : pmAnswerHTML(q);
+  $("#app").classList.toggle("pmwide", wide);
   $("#app").innerHTML = `
     <div class="qmeta"><a href="#" data-back>← 一覧</a><span>${esc(q.src)} 問${q.no}</span><span class="tag S">${esc(q.field)}</span><span>${esc(q.sel)}</span><span class="timer" id="pmt" style="margin-left:auto"></span></div>
     <h1 style="margin-bottom:.3em">${esc(q.theme)}</h1>
-    <div class="pmtabs"><span class="seg">${[["q","問題文"],["a","解答"],["e","解説"]].map(([v,l])=>`<label><input type="radio" name="ptab" value="${v}" ${tab===v?"checked":""}>${l}</label>`).join("")}</span>
+    <div class="pmtabs"><span class="seg">${(wide ? [["a","解答"],["e","解説"]] : [["q","問題文"],["a","解答"],["e","解説"]]).map(([v,l])=>`<label><input type="radio" name="ptab" value="${v}" ${tab===v?"checked":""}>${l}</label>`).join("")}</span>
       ${sc ? `<b style="margin-left:10px">${sc.pct}点</b>${sc.left?`<span class="small muted">（記述 ${sc.left}件を自己採点してください）</span>`:""}` : ""}</div>
-    <div id="pmbody">${tab === "q" ? pmProblemHTML(q) : tab === "a" ? pmAnswerHTML(q) : pmExpHTML(q)}</div>
+    ${wide ? `<div class="pmsplit"><div id="pmleft" data-q="${q.id}">${pmProblemHTML(q)}</div><div id="pmbody">${side}</div></div>`
+      : `<div id="pmbody">${tab === "q" ? pmProblemHTML(q) : side}</div>`}
     <div class="navq">${prev ? `<button class="btn sm" data-pm="${prev.id}">← ${esc(prev.src)} 問${prev.no}</button>` : "<span></span>"}${next ? `<button class="btn sm" data-pm="${next.id}">${esc(next.src)} 問${next.no} →</button>` : ""}</div>`;
   const hdr = document.querySelector("header"); if (hdr) document.documentElement.style.setProperty("--hdr", hdr.offsetHeight + "px");
+  if (keep) $("#pmleft").scrollTop = keep;
   clearInterval(PMT);
   const tick = () => { const el = $("#pmt"); if (!el) return; const s = Math.floor((Date.now() - PM_T0) / 1000); el.textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; el.style.color = s > 1800 ? "var(--ng)" : ""; };
   tick(); PMT = setInterval(tick, 1000);
