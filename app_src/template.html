@@ -919,7 +919,7 @@ function pmAnswerHTML(q){
 }
 function pmExpHTML(q){
   const ex = q.ex && q.ex.length ? q.ex.map(x => (x.s ? `<h3>${esc(x.s)}</h3>` : "") + x.t.split(/\n+/).map(p=>`<p>${qfmt(p, q).replace(/^(（\d+）|空欄\s*[a-zA-Zア-ン]+|[ア-ン](?:[，,][ア-ン])*(?=[　 ]))/, "<b>$1</b> ")}</p>`).join("")).join("")
-    : q.lk ? `<p class="muted">🔒 参考書の解説は、ログインすると表示されます。　${SYNC.user ? esc(EXP.msg || "読み込んでいます…") : `<a href="#" data-login>Googleでログイン</a>`}</p>`
+    : q.lk ? `<p class="muted">🔒 参考書の解説は、ログインすると表示されます。　${lockState()}</p>`
     : `<p class="muted">この問題の詳しい解説はまだありません。解答例と出題趣旨・採点講評を参考にしてください。</p>`;
   return `<div class="callout key"><b>出題趣旨（IPA）</b>${esc(q.aim || "—")}</div>
     <div class="pmexp">${ex}</div>
@@ -1077,6 +1077,9 @@ document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState
    試験ごとに保存し（e: {問題id: 解説} のJSON文字列）、公開版でログインした本人だけが読む（firestore.rules）。 */
 let UNLOCKED = false;
 const EXP = { msg:"" };
+// 鍵付きの解説の欄に出す状態。読み込みが終わってもこの問題の解説が無いのは、Firebaseにまだ保存されていないとき
+const lockState = () => !SYNC.user ? `<a href="#" data-login>Googleでログイン</a>`
+  : esc(EXP.msg || (UNLOCKED ? "この問題の解説はまだFirebaseに保存されていません（PCのローカル版で「記録」→「Firebaseに保存」を押すと表示されます）" : "読み込んでいます…"));
 const BK = [...Q.filter(q=>q.bk), ...PM.filter(q=>q.bk)];   // 科目Bは q.ex（設問ごとの解説）を "pm_試験ID" の文書に入れる
 async function loadExp(){
   if (UNLOCKED || !(Q.some(q=>q.lk) || PM.some(q=>q.lk))) return;
@@ -1146,7 +1149,7 @@ function expHTML(q, cls){
     }
     return head + (seg ? expSentences(seg).map(p=>`<p class="${cls}">${qfmt(p, q)}</p>`).join("") : "");
   }).join("");
-  if (q.lk) return `<p class="${cls} muted">🔒 この問題の解説はログインすると表示されます。　${SYNC.user ? esc(EXP.msg || "読み込んでいます…") : `<a href="#" data-login>Googleでログイン</a>`}</p>`;
+  if (q.lk) return `<p class="${cls} muted">🔒 この問題の解説はログインすると表示されます。　${lockState()}</p>`;
   return "";
 }
 document.addEventListener("click", e=>{
