@@ -240,6 +240,10 @@ main.gwide{max-width:1180px}
 .grade button.on[data-g="0"]{background:var(--ng);border-color:var(--ng);color:var(--panel)}
 .pmexp p{margin:.5em 0}
 main.pmwide{max-width:1500px}
+.qk .qk-sit{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 10px;font-size:.95rem}
+.qk .qk-q{margin:0 0 8px}
+.qk .tw table{min-width:0} .qk .tw td:first-child{width:7em}
+.qk textarea{width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel);color:var(--ink);resize:vertical}
 .pmsplit{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
 #pmleft{position:sticky;top:calc(var(--hdr,56px) + 58px);max-height:calc(100vh - var(--hdr,56px) - 70px);overflow-y:auto;padding-right:8px;overscroll-behavior:contain}
 .pmexp h3{font-size:.98rem;margin:1.2em 0 .3em}
@@ -294,7 +298,7 @@ const pct = (a,b) => b? Math.round(a*100/b) : 0;
 
 /* ---------- 保存（このブラウザだけに保存） ---------- */
 const KEY = "apA-study-v1";
-let S = { ans:{}, flag:{}, box:{}, hist:[], pm:{} };
+let S = { ans:{}, flag:{}, box:{}, hist:[], pm:{}, pq:{} };
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch(e) {}
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} scheduleSync(); }
 function record(q, ok){
@@ -312,12 +316,12 @@ $("#nav").addEventListener("click", e=>{ const b=e.target.closest("button"); if(
   if (view==="quiz" && session && !session.finished && !confirm("テストを中断しますか？（解答済みの記録は残ります）")) return;
   go(b.dataset.v); });
 function render(){
-  document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current", b.dataset.v===view || (view==="quiz"&&b.dataset.v==="setup") || (view==="result"&&b.dataset.v==="setup") || (view==="pmq"&&b.dataset.v==="pm")));
+  document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current", b.dataset.v===view || (view==="quiz"&&b.dataset.v==="setup") || (view==="result"&&b.dataset.v==="setup") || ((view==="pmq"||view==="pmquick")&&b.dataset.v==="pm")));
   // 前の画面が #app に付けたイベント処理を外す（残っていると、別の画面の操作で前の画面が描き直される）
   const app = $("#app"); app.onclick = app.onchange = app.oninput = null;
   if (view !== "pmq") app.classList.remove("pmwide");
   app.classList.toggle("gwide", view==="guide");
-  ({home:renderHome, setup:renderSetup, quiz:renderQuiz, result:renderResult, guide:renderGuide, cards:renderCards, gloss:renderGloss, record:renderRecord, pm:renderPm, pmq:renderPmQ})[view]();
+  ({home:renderHome, setup:renderSetup, quiz:renderQuiz, result:renderResult, guide:renderGuide, cards:renderCards, gloss:renderGloss, record:renderRecord, pm:renderPm, pmq:renderPmQ, pmquick:renderPmQuick})[view]();
 }
 $("#hdr-sub").textContent = `科目A ${Q.length}問／科目B ${(DATA.pm||[]).length}問／カード${CARDS.length}語`;
 
@@ -345,6 +349,7 @@ function renderHome(){
       <button class="btn big" data-q="new"><b>新傾向オリジナル問題</b><span>生成AI・ゼロトラスト・SBOMなど令和4〜7年度の頻出テーマ</span></button>
       <button class="btn big" data-q="weak" ${weak?"":"disabled"}><b>苦手を復習（${weak}問）</b><span>間違えた問題・正答率60%未満の問題</span></button>
       <button class="btn big" data-q="pm"><b>科目B（午後）の過去問</b><span>平成25年〜令和7年の${(DATA.pm||[]).length}問。選択式は自動採点、記述式は解答例で自己採点</span></button>
+      <button class="btn big" data-q="pmquick"><b>科目Bをスキマ時間で</b><span>記述ミニ問題・採点講評のつまずきポイント。1回1〜3分</span></button>
       <button class="btn big" data-q="guide"><b>要点解説で弱点を補強</b><span>間違えやすい用語を比較表とひっかけポイントで整理</span></button>
       <button class="btn big" data-q="cards"><b>暗記カードで用語を覚える</b><span>「覚えた」を3回で習得扱い</span></button>
       <button class="btn big" data-q="setup"><b>条件を指定して出題</b><span>年度・分野・問題数・モードを選択</span></button>
@@ -362,6 +367,7 @@ function renderHome(){
     if(k==="cards") go("cards");
     if(k==="guide") go("guide");
     if(k==="pm") go("pm");
+    if(k==="pmquick") go("pmquick");
     if(k==="setup") go("setup");
   };
 }
@@ -844,7 +850,7 @@ function renderPm(){
     && (PSET.st === "all" || (PSET.st === "new" ? !S.pm[q.id] : PSET.st === "done" ? pmScore(q) : S.pm[q.id] && !pmScore(q))));
   const done = PM.map(pmScore).filter(Boolean);
   $("#app").innerHTML = `
-    <h1>科目B（午後）</h1>
+    <div class="row spread"><h1>科目B（午後）</h1><button class="btn sm primary" id="toquick">スキマ時間で対策 →</button></div>
     <div class="grid g3">
       <div class="panel stat"><div class="v">${done.length}<span class="small muted"> / ${PM.length}</span></div><div class="k">採点した問題</div></div>
       <div class="panel stat"><div class="v">${done.length ? Math.round(done.reduce((s,x)=>s+x.pct,0)/done.length) : 0}点</div><div class="k">平均点（1問100点換算）</div></div>
@@ -868,9 +874,109 @@ function renderPm(){
     if (t.id === "pexam") PSET.exam = t.value;
     if (t.name === "pf" || t.name === "pst" || t.id === "pexam") { pmPersist(); renderPm(); }
   };
-  $("#app").onclick = e => { const b = e.target.closest("[data-pm]"); if (b) openPm(b.dataset.pm); };
+  $("#app").onclick = e => { if (e.target.closest("#toquick")) return go("pmquick"); const b = e.target.closest("[data-pm]"); if (b) openPm(b.dataset.pm); };
 }
 function openPm(id){ PSET.cur = id; PSET.tab = "q"; pmPersist(); PM_T0 = Date.now(); go("pmq"); }
+
+/* ---------- 科目B スキマ時間 ----------
+   記述ミニ問題（DATA.pmq.mini、独自に作成）・つまずきドリル（IPAの採点講評を設問ごとに分けたもの）・分野別攻略（DATA.pmq.fields）。
+   ミニ問題の記録は S.pq[id] = { t:更新時刻, g:1（○）| 0.5（△）| 0（×） }。 */
+const PMQ = DATA.pmq || {fields:{}, mini:[]};
+const QK_FIELDS = PM_FIELDS.filter(f => PMQ.fields[f]);
+let QK = { tab:"mini", field:"", cur:null, last:null, open:false, draft:"", di:-1 };
+try { const v = JSON.parse(localStorage.getItem(KEY+"-pq")||"{}"); QK.tab = v.tab || QK.tab; QK.field = v.field || ""; } catch(e) {}
+const qkPersist = () => { try { localStorage.setItem(KEY+"-pq", JSON.stringify({tab:QK.tab, field:QK.field})); } catch(e) {} };
+const paren = s => (s||"").replace(/（/g,"(").replace(/）/g,")").replace(/\s/g,"");
+// 採点講評を設問ごとに区切り、正答率の低さや誤答の傾向を述べたものだけを残す
+const WEAK_RE = /正答率が(低|振るわ)|誤り|誤解|誤った|多かった|多く見|散見|見受け|不十分|できていない|理解されていない|混同/;
+const PM_DRILL = PM.flatMap(q => {
+  const out = []; let cur = null;
+  for (const s of (q.cmnt||"").split(/(?<=。)/).map(x=>x.trim()).filter(Boolean)) {
+    const m = s.match(/設問\s*(\d+)\s*([（(]\d+[)）])?/);
+    if (m && (!cur || cur.s !== "設問"+m[1] || (m[2] && paren(m[2]) !== cur.sub))) { cur = {q, s:"設問"+m[1], sub:paren(m[2]), t:[]}; out.push(cur); }
+    if (cur) cur.t.push(s);
+  }
+  return out.filter(c => WEAK_RE.test(c.t.join("")));
+});
+const drillRows = c => (c.q.rows||[]).filter(r => r.s === c.s && (!c.sub || paren(r.sub) === c.sub));
+const miniList = () => PMQ.mini.filter(m => !QK.field || m.field === QK.field);
+// 未回答 → 評価の低い順 → 古い順。直前に採点した問題は、ほかに候補があれば続けて出さない
+function miniPick(){
+  const rank = m => { const r = (S.pq||{})[m.id]; return r ? [1, r.g, r.t] : [0, 0, 0]; };
+  const l = miniList().sort((a,b)=>{ const x=rank(a), y=rank(b); return x[0]-y[0] || x[1]-y[1] || x[2]-y[2]; });
+  return (l.length > 1 ? l.filter(m => m.id !== QK.last) : l)[0] || null;
+}
+function renderPmQuick(){
+  const tabs = [["mini","記述ミニ問題"],["drill","つまずきドリル"],["tips","分野別攻略"]];
+  const fields = QK.tab === "drill" ? PM_FIELDS : QK_FIELDS;
+  if (QK.field && !fields.includes(QK.field)) QK.field = "";
+  const chips = `<div class="row" style="margin-top:10px"><select id="qfs"><option value="">すべての分野</option>${fields.map(f=>`<option value="${esc(f)}" ${QK.field===f?"selected":""}>${esc(f)}</option>`).join("")}</select></div>`;
+  let body = "";
+  if (QK.tab === "mini") {
+    const m = PMQ.mini.find(x => x.id === QK.cur) || miniPick(); QK.cur = m && m.id;
+    const ml = miniList();
+    const cnt = g => ml.filter(x => (S.pq||{})[x.id]?.g === g).length;
+    body = !m ? `<div class="empty">この分野のミニ問題はまだありません</div>` : `
+      <div class="row spread small muted" style="margin:4px 0 8px"><span>○ ${cnt(1)}　△ ${cnt(0.5)}　× ${cnt(0)}　未 ${ml.length - cnt(1) - cnt(0.5) - cnt(0)}（${ml.length}問）</span><span>1問 2〜3分</span></div>
+      <div class="panel qk">
+        <div class="small muted">${esc(m.field)}</div>
+        <p class="qk-sit">${md(m.sit)}</p>
+        <p class="qk-q"><b>${md(m.q)}</b>（${m.lim}字以内）</p>
+        <textarea id="qka" rows="3" placeholder="ここに書いても、頭の中で考えるだけでもよい">${esc(QK.draft)}</textarea>
+        <div class="small muted" id="qkn">${[...QK.draft].length}字 / ${m.lim}字</div>
+        ${QK.open ? `
+          <div class="callout key"><b>解答例</b>${md(m.a)}</div>
+          <div class="gh">採点のポイント（両方入っていれば○、片方なら△）</div>${lis(m.pts)}
+          <div class="callout tip"><b>解説</b>${md(m.why)}</div>
+          ${m.guide && GUIDE.some(t=>t.id===m.guide) ? `<div class="glinks">📘 要点解説：<a data-topic="${m.guide}">${esc(GUIDE.find(t=>t.id===m.guide).t)}</a></div>` : ""}
+          <div class="grade">自己採点：<button data-qg="1" data-g="1">○ できた</button><button data-qg="0.5" data-g="0.5">△ 一部</button><button data-qg="0" data-g="0">× できなかった</button></div>`
+        : `<button class="btn primary" id="qkshow" style="margin-top:10px;width:100%">解答例を見る</button>`}
+      </div>`;
+  } else if (QK.tab === "drill") {
+    const l = PM_DRILL.filter(c => !QK.field || c.q.field === QK.field);
+    if (QK.di < 0 || QK.di >= l.length) QK.di = Math.floor(Math.random() * l.length);
+    const c = l[QK.di], rows = c ? drillRows(c) : [];
+    body = !c ? `<div class="empty">該当するカードがありません</div>` : `
+      <div class="row spread small muted" style="margin:4px 0 8px"><span>${l.length}件のつまずきポイント</span><span>1枚 1分</span></div>
+      <div class="panel qk">
+        <div class="small muted">${esc(c.q.src)} 問${c.q.no}・${esc(c.q.field)}</div>
+        <div style="font-weight:700;margin:2px 0 8px">${esc(c.q.theme)}　<span class="tag T">${esc(c.s)}${esc(c.sub)}</span></div>
+        <div class="callout trap"><b>⚠ 採点講評より</b>${c.t.map(esc).join("<br>")}</div>
+        ${QK.open ? (rows.length ? `<div class="gh">解答例</div><div class="tw"><table><tbody>${rows.map(r=>`<tr><td>${esc(r.s)}${esc(r.sub||"")}${r.k?` ${esc(r.k)}`:""}</td><td>${esc(r.a)}${r.note?`<div class="small muted">${esc(r.note)}</div>`:""}</td></tr>`).join("")}</tbody></table></div>` : `<p class="small muted">この設問の解答例は見つかりませんでした</p>`)
+          : `<button class="btn" id="qkshow" style="width:100%">解答例を見る</button>`}
+        <div class="row spread" style="margin-top:10px"><button class="btn sm ghost" data-pmopen="${c.q.id}">この問題を開く</button><button class="btn sm primary" id="qknext">次のカード →</button></div>
+      </div>
+      <p class="note">採点講評はIPAが公表したもので、受験者が実際につまずいた設問と誤答の傾向が書かれています。問題文を読む前に「どこで間違えやすいか」を知っておくと、本番で同じ失敗を避けられます。</p>`;
+  } else {
+    body = (QK.field ? [QK.field] : QK_FIELDS).map(f => { const d = PMQ.fields[f], qs = PM.filter(q=>q.field===f || (f==="経営戦略" && q.field==="情報戦略")).slice().reverse();   // 情報戦略は1問だけなので経営戦略にまとめる
+      return `<div class="panel" style="margin-bottom:12px">
+        <h2 style="margin-top:0">${esc(f)}</h2>
+        <div class="gh">よく問われる型</div>${lis(d.types)}
+        <div class="gh">記述・解き方のコツ</div>${lis(d.tips)}
+        <div class="glinks">📘 要点解説：${d.guide.filter(id=>GUIDE.some(t=>t.id===id)).map(id=>`<a data-topic="${id}">${esc(GUIDE.find(t=>t.id===id).t)}</a>`).join("")}</div>
+        <details style="margin-top:10px"><summary class="small">過去に出たテーマ（${qs.length}問）</summary><ul class="small">${qs.map(q=>`<li><a data-pmopen="${q.id}" style="cursor:pointer">${esc(q.src)} 問${q.no}：${esc(q.theme)}</a></li>`).join("")}</ul></details>
+      </div>`; }).join("");
+  }
+  $("#app").innerHTML = `
+    <div class="row spread"><h1>科目B スキマ時間</h1><button class="btn sm" id="qkback">← 科目Bの過去問</button></div>
+    <p class="muted small" style="margin-top:-6px">1回1〜3分。電車やちょっとした待ち時間に、記述の練習とつまずきやすい設問の確認ができます。</p>
+    <span class="seg">${tabs.map(([v,l])=>`<label><input type="radio" name="qt" value="${v}" ${QK.tab===v?"checked":""}>${l}</label>`).join("")}</span>
+    ${chips}
+    <div style="margin-top:12px">${body}</div>`;
+  const ta = $("#qka");
+  if (ta) ta.oninput = () => { QK.draft = ta.value; const m = PMQ.mini.find(x=>x.id===QK.cur); $("#qkn").textContent = `${[...ta.value].length}字 / ${m.lim}字`; };
+  $("#app").onchange = e => { const t = e.target;
+    if (t.name === "qt") { QK.tab = t.value; QK.open = false; qkPersist(); renderPmQuick(); }
+    if (t.id === "qfs") { QK.field = t.value; QK.cur = null; QK.di = -1; QK.open = false; QK.draft = ""; qkPersist(); renderPmQuick(); } };
+  $("#app").onclick = e => { const t = e.target.closest("button,a"); if (!t) return;
+    if (t.id === "qkback") go("pm");
+    if (t.id === "qkshow") { QK.open = true; renderPmQuick(); }
+    if (t.id === "qknext") { QK.di = -1; QK.open = false; renderPmQuick(); window.scrollTo(0,0); }
+    if (t.dataset.topic) openTopic(t.dataset.topic);
+    if (t.dataset.pmopen) openPm(t.dataset.pmopen);
+    if (t.dataset.qg) { (S.pq = S.pq || {})[QK.cur] = { t:Date.now(), g:+t.dataset.qg }; save();
+      QK.last = QK.cur; QK.cur = null; QK.open = false; QK.draft = ""; renderPmQuick(); window.scrollTo(0,0); } };
+}
 
 function pmRowsHTML(q){
   const r = S.pm[q.id] || {a:{}, g:{}}, done = !!r.done;
@@ -1093,7 +1199,8 @@ async function fbLogout(){
 }
 function mergeState(a, b){
   const reset = Math.max(a.resetAt||0, b.resetAt||0), newer = (x,y)=>((x&&x.t)||0) >= ((y&&y.t)||0) ? x : y;
-  const out = { ans:{}, flag:{...b.flag, ...a.flag}, box:{}, boxT:{}, hist:[], pm:{}, resetAt:reset };
+  const out = { ans:{}, flag:{...b.flag, ...a.flag}, box:{}, boxT:{}, hist:[], pm:{}, pq:{}, resetAt:reset };
+  for (const id of new Set([...Object.keys(a.pq||{}), ...Object.keys(b.pq||{})])) { const r = newer(a.pq?.[id], b.pq?.[id]); if (r && (r.t||0) >= reset) out.pq[id] = r; }
   for (const id of new Set([...Object.keys(a.pm||{}), ...Object.keys(b.pm||{})])) { const r = newer(a.pm?.[id], b.pm?.[id]); if (r && (r.t||0) >= reset) out.pm[id] = r; }
   for (const id of new Set([...Object.keys(a.ans||{}), ...Object.keys(b.ans||{})])) { const r = newer(a.ans?.[id], b.ans?.[id]); if (r && (r.t||0) >= reset) out.ans[id] = r; }
   for (const k of new Set([...Object.keys(a.box||{}), ...Object.keys(b.box||{})])) {

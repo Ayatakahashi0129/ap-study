@@ -166,7 +166,11 @@ def main():
             q["ex"], q["bk"] = pm_book[q["id"]], 1
         elif q["id"] in pm_exp:
             q["ex"] = pm_exp[q["id"]]
-    data = {"questions": qs, "cards": fc, "guide": guide, "pm": pm,"groups": {f: [g for g in GROUPS if any(q["g"] == g and q["f"] == f for q in qs)] for f in "TMS"}}
+    pmq = load("pm_quick.json")   # 科目Bのスキマ時間対策（記述ミニ問題・分野別攻略、独自に作成）
+    for m in pmq.get("mini", []):   # 解答例が字数制限を超えていないか
+        if len(m["a"].rstrip("。")) > m["lim"]:
+            print(f"警告: ミニ問題 {m['id']} の解答例が{len(m['a'].rstrip('。'))}字で、制限の{m['lim']}字を超えています")
+    data = {"questions": qs, "cards": fc, "guide": guide, "pm": pm, "pmq": pmq,"groups": {f: [g for g in GROUPS if any(q["g"] == g and q["f"] == f for q in qs)] for f in "TMS"}}
     js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     tpl = (SRC / "template.html").read_text(encoding="utf-8")
     out = ROOT / "AP科目A対策.html"
