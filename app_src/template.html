@@ -16,6 +16,7 @@
   --accent:#2f5bea; --accent-ink:#ffffff; --accent-soft:#e8eefe;
   --ok:#12805c; --ok-soft:#e3f5ec; --ng:#c4320a; --ng-soft:#fdece6; --warn:#b54708;
   --T:#2f5bea; --M:#7a3fd1; --S:#0e8a7d; --warn-soft:#fdf1e3;
+  --bT:#2f5bea; --bM:#6b34c4; --bS:#0c7a6e; --hl:#fff6d6; --hl-line:#d9a400;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --axis:#c3c2b7; /* chart series (dataviz reference palette, validated) */
   --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
   --radius:12px;
@@ -26,6 +27,7 @@
     --accent:#6d8dff; --accent-ink:#0f1218; --accent-soft:#1f2a4a;
     --ok:#3ccf91; --ok-soft:#12302a; --ng:#ff7a59; --ng-soft:#3a1e17; --warn:#f6a54b;
     --T:#6d8dff; --M:#b38cff; --S:#3cc7b5; --warn-soft:#352614;
+    --bT:#2a46b0; --bM:#5a2ea6; --bS:#0a6359; --hl:#332b10; --hl-line:#c79a1a;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --axis:#383835;
     --shadow:none;
   }
@@ -152,17 +154,42 @@ mark{background:var(--accent-soft);color:inherit;padding:0 2px;border-radius:3px
 a{color:var(--accent)}
 .note{font-size:.85rem;color:var(--muted);margin-top:24px}
 /* 要点解説 */
-.topic{scroll-margin-top:110px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);margin-bottom:10px;box-shadow:var(--shadow)}
-.topic>summary{list-style:none;cursor:pointer;padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:start}
+.topic{scroll-margin-top:110px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);margin-bottom:14px;box-shadow:var(--shadow);overflow:hidden}
+.topic>summary{list-style:none;cursor:pointer;position:relative;overflow:hidden;padding:14px 90px 14px 18px;color:#fff;background:var(--bT);display:grid;grid-template-columns:1fr auto;gap:0 12px;align-items:start}
+.topic>summary.M{background:var(--bM)} .topic>summary.S{background:var(--bS)}
 .topic>summary::-webkit-details-marker{display:none}
-.topic>summary .tt{font-weight:700;font-size:1.02rem}
-.topic>summary .ld{grid-column:1 / -1;color:var(--muted);font-size:.88rem}
-.topic>summary .lv{color:var(--warn);font-size:.85rem;white-space:nowrap}
-.topic[open]>summary{border-bottom:1px solid var(--line)}
-.topic .tb{padding:6px 16px 16px}
+.topic>summary .kick{font-size:.72rem;letter-spacing:.08em;opacity:.85}
+.topic>summary .tt{grid-column:1 / -1;font-weight:800;font-size:1.25rem;line-height:1.35;margin-top:2px}
+.topic>summary .en{grid-column:1 / -1;font-size:.78rem;opacity:.85;line-height:1.4}
+.topic>summary .ld{grid-column:1 / -1;font-size:.9rem;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.3)}
+.topic>summary .lv{font-size:.8rem;white-space:nowrap;opacity:.9}
+.topic>summary .no{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:4rem;font-weight:900;line-height:1;opacity:.22;font-variant-numeric:tabular-nums;pointer-events:none}
+.topic .tb{padding:6px 18px 16px}
 .topic .tb p{margin:.6em 0}
 .topic .tb ul{margin:.5em 0;padding-left:1.3em}
 .topic .tb li{margin:.25em 0}
+main.gwide{max-width:1180px}
+@media (max-width:560px){ .topic>summary{padding:12px 54px 12px 14px} .topic>summary .no{font-size:2.6rem;right:8px} .topic>summary .tt{font-size:1.1rem} .topic .tb{padding:6px 12px 14px} .gpc{grid-template-columns:1fr} }
+.gcols{display:grid;grid-template-columns:minmax(0,1fr);gap:0 22px}
+@media (min-width:900px){ .gcols{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
+.gh{display:flex;align-items:center;gap:6px;font-weight:800;font-size:.88rem;margin:14px 0 4px}
+.gh::before{content:"";width:4px;height:1em;border-radius:2px;background:var(--accent)}
+.gname .chips{display:flex;flex-wrap:wrap;gap:6px}
+.gname .nm{display:inline-flex;align-items:baseline;gap:6px;border:1px solid var(--line);border-radius:8px;padding:3px 9px;background:var(--bg);font-size:.86rem}
+.gname .nm>b{color:var(--accent);font-size:1rem} .gname .nm span b{color:var(--accent)}
+.gname .small{margin-top:6px}
+.gpc{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.88rem}
+.gpc>div{border-radius:10px;padding:8px 10px}
+.gpc>div:first-child{background:var(--ok-soft)} .gpc>div:last-child{background:var(--ng-soft)}
+.gpc>div>b{display:block;font-size:.8rem} .gpc>div:first-child>b{color:var(--ok)} .gpc>div:last-child>b{color:var(--ng)}
+.gpc ul{margin:.2em 0 0;padding-left:1.1em}
+.gcols .tw td:first-child{white-space:normal;min-width:6em}
+.tw tr.hi td{background:var(--hl);font-weight:700}
+.tw tr.hi td:first-child{box-shadow:inset 4px 0 0 var(--hl-line)}
+.callout.plus{background:var(--bg);border:1px solid var(--line)} .callout.plus>b:first-child{color:var(--muted)}
+.callout.plus dl{margin:2px 0 0} .callout.plus dt{font-weight:700;display:inline} .callout.plus dt::after{content:"："} .callout.plus dd{display:inline;margin:0} .callout.plus dd::after{content:"";display:block;margin-bottom:4px}
+.callout.ex{background:var(--bg);border:1px dashed var(--line)}
+.callout ul{margin:.2em 0 0;padding-left:1.2em}
 .tw{overflow-x:auto;margin:10px 0;-webkit-overflow-scrolling:touch}
 .tw table{border-collapse:collapse;width:100%;min-width:420px;font-size:.9rem}
 .tw th,.tw td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
@@ -170,11 +197,11 @@ a{color:var(--accent)}
 .tw td:first-child{font-weight:600;white-space:nowrap}
 .formula{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:inherit;white-space:pre-wrap;font-size:.92rem;margin:10px 0;font-variant-numeric:tabular-nums}
 .callout{border-radius:10px;padding:9px 12px;margin:10px 0;font-size:.92rem}
-.callout b{display:block;font-size:.8rem;margin-bottom:2px}
-.callout.trap{background:var(--ng-soft);border-left:4px solid var(--ng)} .callout.trap b{color:var(--ng)}
-.callout.tip{background:var(--ok-soft);border-left:4px solid var(--ok)} .callout.tip b{color:var(--ok)}
-.callout.key{background:var(--accent-soft);border-left:4px solid var(--accent);font-size:1rem;font-weight:600} .callout.key b{color:var(--accent)}
-.callout.eg{background:var(--warn-soft);border-left:4px solid var(--warn)} .callout.eg b{color:var(--warn)}
+.callout>b:first-child{display:block;font-size:.8rem;margin-bottom:2px}
+.callout.trap{background:var(--hl);border-left:4px solid var(--hl-line)} .callout.trap>b:first-child{color:var(--warn)}
+.callout.tip{background:var(--ok-soft);border-left:4px solid var(--ok)} .callout.tip>b:first-child{color:var(--ok)}
+.callout.key{background:var(--accent-soft);border-left:4px solid var(--accent);font-size:1rem;font-weight:600} .callout.key>b:first-child{color:var(--accent)}
+.callout.eg{background:var(--warn-soft);border-left:4px solid var(--warn)} .callout.eg>b:first-child{color:var(--warn)}
 .dg{margin:12px 0;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 8px}
 .dg svg{display:block;margin:0 auto;width:100%;height:auto;font-family:inherit;overflow:visible}
 @media (max-width:560px){ .dg{overflow-x:auto;-webkit-overflow-scrolling:touch} .dg svg{min-width:440px} .dg::after{content:"← 横にスクロールできます →";display:block;text-align:center;font-size:.72rem;color:var(--muted);margin-top:4px} }
@@ -289,6 +316,7 @@ function render(){
   // 前の画面が #app に付けたイベント処理を外す（残っていると、別の画面の操作で前の画面が描き直される）
   const app = $("#app"); app.onclick = app.onchange = app.oninput = null;
   if (view !== "pmq") app.classList.remove("pmwide");
+  app.classList.toggle("gwide", view==="guide");
   ({home:renderHome, setup:renderSetup, quiz:renderQuiz, result:renderResult, guide:renderGuide, cards:renderCards, gloss:renderGloss, record:renderRecord, pm:renderPm, pmq:renderPmQ})[view]();
 }
 $("#hdr-sub").textContent = `科目A ${Q.length}問／科目B ${(DATA.pm||[]).length}問／カード${CARDS.length}語`;
@@ -531,7 +559,7 @@ function topicsFor(q){
     .sort((a,b)=>b.n-a.n || (a.t.f===q.f?-1:1)).slice(0,2).map(x=>x.t);
 }
 let GSET = { q:"", field:"all", sort:"default", brief:false }, GOPEN = null;
-const BRIEF = new Set(["key","svg","eg","trap","tip"]);   // 「要点と図だけ」で表示するブロック
+const BRIEF = new Set(["key","svg","eg","trap","tip","name"]);   // 「要点と図だけ」で表示するブロック
 try { Object.assign(GSET, JSON.parse(localStorage.getItem(KEY+"-guide")||"{}")); GSET.q=""; } catch(e) {}
 function openTopic(id){ GOPEN = id; GSET.q = ""; GSET.field = "all"; go("guide"); }
 /* 図：guide.json の ["svg", 幅, 高さ, [部品...], 説明] を SVG にする。
@@ -601,19 +629,42 @@ function diagram(W, H, items, cap){
   // 図1枚につき主張は1つ。説明文は図の中に書かず、キャプション（cap）に書く
   return `<figure class="dg"><svg viewBox="0 0 ${W} ${H}" style="max-width:${Math.round(W*1.3)}px" role="img" aria-label="${esc(cap||"図")}">${out}</svg>${cap?`<figcaption>${esc(cap)}</figcaption>`:""}</figure>`;
 }
+// 要点解説の文中の **太字** を <b> にする（先にエスケープするので HTML は入らない）
+const md = x => esc(x).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>");
+const lis = a => `<ul>${a.map(x=>`<li>${md(x)}</li>`).join("")}</ul>`;
 function block(b){
   const [type, a, c] = b;
-  const cell = s => esc(s).replace(/\n/g,"<br>");
-  if (type==="svg") return diagram(b[1], b[2], b[3], b[4]);
-  if (type==="key") return `<div class="callout key"><b>これだけ覚える</b>${esc(a)}</div>`;
-  if (type==="eg") return `<div class="callout eg"><b>たとえると</b>${esc(a)}</div>`;
-  if (type==="p") return `<p>${esc(a)}</p>`;
+  const cell = s => md(s);
+  if (type==="svg") return `<div class="gh">しくみ図</div>` + diagram(b[1], b[2], b[3], b[4]);
+  if (type==="key") return `<div class="callout key"><b>これだけ覚える</b>${md(a)}</div>`;
+  if (type==="eg") return `<div class="callout eg"><b>たとえると</b>${md(a)}</div>`;
+  if (type==="p") return `<p>${md(a)}</p>`;
   if (type==="f") return `<pre class="formula">${esc(a)}</pre>`;
-  if (type==="list") return `<ul>${a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`;
-  if (type==="trap") return `<div class="callout trap"><b>ひっかけ注意</b>${esc(a)}</div>`;
-  if (type==="tip") return `<div class="callout tip"><b>覚え方</b>${esc(a)}</div>`;
-  if (type==="table") return `<div class="tw"><table><thead><tr>${a.map(h=>`<th>${cell(h)}</th>`).join("")}</tr></thead><tbody>${c.map(r=>`<tr>${r.map(x=>`<td>${cell(x)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  if (type==="list") return lis(a);
+  // trap は 1文（文字列）でも、複数の注意点（配列）でもよい
+  if (type==="trap") return `<div class="callout trap"><b>⚠ ひっかけ注意</b>${Array.isArray(a)?lis(a):md(a)}</div>`;
+  if (type==="tip") return `<div class="callout tip"><b>覚え方</b>${md(a)}</div>`;
+  // ["name", [[略語の文字, 元の語], ...], 補足]
+  if (type==="name") return `<div class="gname"><div class="gh">名前</div><div class="chips">${a.map(([k,w])=>`<span class="nm"><b>${esc(k)}</b><span>${md(w)}</span></span>`).join("")}</div>${c?`<div class="small">${md(c)}</div>`:""}</div>`;
+  // ["pc", メリット[], デメリット[], 対象]
+  if (type==="pc") return `<div class="gh">メリット・デメリット${b[3]?`（${esc(b[3])}）`:""}</div><div class="gpc"><div><b>○ メリット</b>${lis(a)}</div><div><b>× デメリット</b>${lis(c)}</div></div>`;
+  // ["plus", [[用語, 説明], ...]]
+  if (type==="plus") return `<div class="callout plus"><b>＋α 関連用語</b><dl>${a.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${md(v)}</dd>`).join("")}</dl></div>`;
+  // ["ex", 見出し, 本文]
+  if (type==="ex") return `<div class="callout ex"><b>${esc(a)}</b>${md(c)}</div>`;
+  // ["table", 見出し, 行, 強調する行番号（数値か配列・省略可）, 表の題（省略時「比較表」）]
+  if (type==="table") { const hi = new Set([].concat(b[3] ?? []));
+    return `<div class="gh">${esc(b[4]||"比較表")}</div><div class="tw"><table><thead><tr>${a.map(h=>`<th>${cell(h)}</th>`).join("")}</tr></thead><tbody>${c.map((r,i)=>`<tr${hi.has(i)?' class="hi"':""}>${r.map(x=>`<td>${cell(x)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`; }
   return "";
+}
+// カードの本文：「これだけ覚える」を上に、図・名前・覚え方などを左、表・ひっかけ・関連用語を右に置く（狭い画面では1列）
+const GLEFT = new Set(["svg","name","eg","tip","pc","f","p","list","ex"]);
+const GNO = Object.fromEntries(GUIDE.map((t,i)=>[t.id, String(i+1).padStart(2,"0")]));
+function guideBody(bs){
+  const top = bs.filter(b=>b[0]==="key"), rest = bs.filter(b=>b[0]!=="key");
+  const l = rest.filter(b=>GLEFT.has(b[0])), r = rest.filter(b=>!GLEFT.has(b[0]));
+  const col = x => x.map(block).join("");
+  return col(top) + (l.length && r.length ? `<div class="gcols"><div>${col(l)}</div><div>${col(r)}</div></div>` : col(rest));
 }
 function renderGuide(){
   const k = GSET.q.trim().toLowerCase();
@@ -626,15 +677,15 @@ function renderGuide(){
     if (GSET.sort==="default" && t.g!==last) { html += `<div class="gsec"><span class="tag ${t.f}">${FIELD[t.f]}</span>${esc(t.g)}</div>`; last=t.g; }
     const s = st(t), rel = REL[t.id].length;
     html += `<details class="topic" id="topic-${t.id}" ${GOPEN===t.id||k?"open":""}>
-      <summary><span class="tt">${esc(t.t)}</span><span class="lv" title="難しさ">${"★".repeat(t.lv)}${"☆".repeat(3-t.lv)}</span><span class="ld">${esc(t.lead)}</span></summary>
-      <div class="tb">${t.b.filter(b=>!GSET.brief || BRIEF.has(b[0])).map(block).join("")}
+      <summary class="${t.f}"><span class="kick">応用情報 要点解説 ${GNO[t.id]}｜${esc(t.g)}</span><span class="lv" title="難しさ">${"★".repeat(t.lv)}${"☆".repeat(3-t.lv)}</span><span class="tt">${esc(t.t)}</span>${t.en?`<span class="en">${esc(t.en)}</span>`:""}<span class="ld">${md(t.lead)}</span><span class="no" aria-hidden="true">${GNO[t.id]}</span></summary>
+      <div class="tb">${guideBody(t.b.filter(b=>!GSET.brief || BRIEF.has(b[0])))}
         <div class="rel"><span class="small muted">関連する問題 ${rel}問${s.n?`／解いた${s.n}問の正答率 <b class="${pct(s.c,s.n)>=60?"pass":"fail"}">${pct(s.c,s.n)}%</b>`:""}</span>
           <button class="btn sm primary" data-practice="${t.id}" ${rel?"":"disabled"}>関連問題を解く</button></div>
       </div></details>`;
   }
   $("#app").innerHTML = `
     <div class="row spread"><h1>要点解説</h1>${session && !session.finished && view==="guide" ? `<button class="btn sm" id="gback">← 解いていた問題に戻る</button>`:""}</div>
-    <p class="muted small" style="margin-top:-6px">各テーマは「これだけ覚える」→図→たとえ話→詳しい表の順に並んでいます。まず要点と図で全体をつかみ、細かい違いは表で確認してください。★が多いほど難しいテーマです。</p>
+    <p class="muted small" style="margin-top:-6px">各テーマは「これだけ覚える」を先頭に、左に図・名前・覚え方、右に比較表・ひっかけ注意・関連用語を置いています（スマホでは縦に並びます）。まず要点と図で全体をつかみ、細かい違いは表で確認してください。★が多いほど難しいテーマです。</p>
     <div class="panel" style="margin-bottom:12px">
       <input type="search" id="gsq" placeholder="テーマを検索（例：署名，正規形，請負）" value="${esc(GSET.q)}">
       <div class="row spread" style="margin-top:10px">
