@@ -169,7 +169,7 @@ a{color:var(--accent)}
 .topic .tb ul{margin:.5em 0;padding-left:1.3em}
 .topic .tb li{margin:.25em 0}
 main.gwide{max-width:1180px}
-@media (max-width:560px){ .topic>summary{padding:12px 54px 12px 14px} .topic>summary .no{font-size:2.6rem;right:8px} .topic>summary .tt{font-size:1.1rem} .topic .tb{padding:6px 12px 14px} .gpc{grid-template-columns:1fr} }
+@media (max-width:560px){ .topic>summary{padding:12px 54px 12px 14px;grid-template-columns:1fr} .topic>summary .lv{white-space:normal} .topic>summary .no{font-size:2.6rem;right:8px} .topic>summary .tt{font-size:1.1rem} .topic .tb{padding:6px 12px 14px} .gpc{grid-template-columns:1fr} }
 .gcols{display:grid;grid-template-columns:minmax(0,1fr);gap:0 22px}
 @media (min-width:900px){ .gcols{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
 .gh{display:flex;align-items:center;gap:6px;font-weight:800;font-size:.88rem;margin:14px 0 4px}
@@ -890,10 +890,12 @@ const QK_FIELDS = PM_FIELDS.filter(f => PMQ.fields[f]);
 // 平成26年春以降の問番号（問1は必須）。頻出用語は本番と同じ問番号の順に並べる
 const PM_NO = {"情報セキュリティ":1, "経営戦略":2, "プログラミング":3, "システムアーキテクチャ":4, "ネットワーク":5, "データベース":6, "組込みシステム開発":7, "情報システム開発":8, "プロジェクトマネジメント":9, "サービスマネジメント":10, "システム監査":11};
 const TERM_FIELDS = Object.keys(PMQ.terms || {}).sort((a,b)=>(PM_NO[a]||99)-(PM_NO[b]||99));
+// 新傾向の用語：kind＝up（令和4年以降の科目Bで増えている）／next（科目Aで出題、科目Bではまだ少ない＝予想）
+const TREND_FIELDS = Object.keys(PMQ.trend || {}).sort((a,b)=>(PM_NO[a]||99)-(PM_NO[b]||99));
 const fieldLabel = f => PM_NO[f] ? `問${PM_NO[f]} ${f}` : f;
-let QK = { tab:"mini", field:"", cur:null, last:null, open:false, draft:"", di:-1, q:"" };
-try { const v = JSON.parse(localStorage.getItem(KEY+"-pq")||"{}"); QK.tab = v.tab || QK.tab; QK.field = v.field || ""; } catch(e) {}
-const qkPersist = () => { try { localStorage.setItem(KEY+"-pq", JSON.stringify({tab:QK.tab, field:QK.field})); } catch(e) {} };
+let QK = { tab:"mini", field:"", cur:null, last:null, open:false, draft:"", di:-1, q:"", tm:"freq" };
+try { const v = JSON.parse(localStorage.getItem(KEY+"-pq")||"{}"); QK.tab = v.tab || QK.tab; QK.field = v.field || ""; QK.tm = v.tm === "trend" ? "trend" : "freq"; } catch(e) {}
+const qkPersist = () => { try { localStorage.setItem(KEY+"-pq", JSON.stringify({tab:QK.tab, field:QK.field, tm:QK.tm})); } catch(e) {} };
 const paren = s => (s||"").replace(/（/g,"(").replace(/）/g,")").replace(/\s/g,"");
 // 採点講評を設問ごとに区切り、正答率の低さや誤答の傾向を述べたものだけを残す
 const WEAK_RE = /正答率が(低|振るわ)|誤り|誤解|誤った|多かった|多く見|散見|見受け|不十分|できていない|理解されていない|混同/;
@@ -916,7 +918,7 @@ function miniPick(){
 }
 function renderPmQuick(){
   const tabs = [["mini","記述ミニ問題"],["drill","つまずきドリル"],["terms","頻出用語"],["tips","分野別攻略"]];
-  const fields = (QK.tab === "drill" ? PM_FIELDS : QK.tab === "terms" ? TERM_FIELDS : QK_FIELDS).slice().sort((a,b)=>(PM_NO[a]||99)-(PM_NO[b]||99));
+  const fields = (QK.tab === "drill" ? PM_FIELDS : QK.tab === "terms" ? (QK.tm === "trend" ? TREND_FIELDS : TERM_FIELDS) : QK_FIELDS).slice().sort((a,b)=>(PM_NO[a]||99)-(PM_NO[b]||99));
   if (QK.field && !fields.includes(QK.field)) QK.field = "";
   const chips = `<div class="row" style="margin-top:10px"><select id="qfs"><option value="">すべての分野</option>${fields.map(f=>`<option value="${esc(f)}" ${QK.field===f?"selected":""}>${esc(fieldLabel(f))}</option>`).join("")}</select>${QK.tab==="terms"?`<input type="search" id="qks" placeholder="用語を検索（例：DNS、ログ）" value="${esc(QK.q)}" style="flex:1;min-width:160px">`:""}</div>`;
   let body = "";
@@ -957,21 +959,31 @@ function renderPmQuick(){
       <p class="note">採点講評はIPAが公表したもので、受験者が実際につまずいた設問と誤答の傾向が書かれています。問題文を読む前に「どこで間違えやすいか」を知っておくと、本番で同じ失敗を避けられます。</p>`;
   } else if (QK.tab === "terms") {
     // 要点解説と同じカードで表示する（帯：分野色・用語名・正式名称・ひとこと、本文：左に図と解説、右に表・設問のポイント・読み方）
-    const k = QK.q.trim().toLowerCase();
+    // 「過去の頻出」は PMQ.terms、「新傾向」は PMQ.trend を使う
+    const trend = QK.tm === "trend", src = trend ? PMQ.trend : PMQ.terms, k = QK.q.trim().toLowerCase();
     const short = id => { const q = PMBY[id]; return `${q.src.replace(/年度?|期/g,"").replace("平成","H").replace("令和","R")} 問${q.no}`; };
-    body = (QK.field ? [QK.field] : TERM_FIELDS).map(f => {
-      const d = PMQ.terms[f], total = PM.filter(q=>q.field===f).length, fc = f === "経営戦略" ? "S" : ["プロジェクトマネジメント","サービスマネジメント","システム監査"].includes(f) ? "M" : "T";
+    const badge = (x, total) => !trend ? `<span class="lv" title="過去${total}問のうち、問題文に出てきた問題の数">${total}問中${x.ids.length}問に登場</span>`
+      : x.kind === "up" ? `<span class="lv" title="科目Bの問題冊子で、この用語が出てきた問題の数">↑ 増加：令和4年以降 ${x.cnt.n}/${x.cnt.N}問・以前 ${x.cnt.o}/${x.cnt.O}問</span>`
+      : `<span class="lv" title="科目Aの新傾向で出題。科目Bではまだ少ない">予想：科目Aで出題・科目Bはまだ少ない</span>`;
+    body = (QK.field ? [QK.field] : (trend ? TREND_FIELDS : TERM_FIELDS)).map(f => {
+      const d = src[f], total = PM.filter(q=>q.field===f).length, fc = f === "経営戦略" ? "S" : ["プロジェクトマネジメント","サービスマネジメント","システム監査"].includes(f) ? "M" : "T";
+      if (!d) return "";
       const list = d.list.filter(x => !k || JSON.stringify([x.t, x.en, x.lead, x.b]).toLowerCase().includes(k));
       if (k && !list.length) return "";
       return `<div class="gsec"><span class="tag ${fc}">${esc(fieldLabel(f))}</span></div>
-        ${k ? "" : `<div class="callout rd" style="margin-bottom:12px"><b>${esc(fieldLabel(f))} の問題文の読み方</b>${lis(d.read)}</div>`}
-        ${list.map((x, i) => `<details class="topic" ${k?"open":""}>
-          <summary class="${fc}"><span class="kick">科目B 頻出用語｜${esc(fieldLabel(f))}</span><span class="lv" title="過去${total}問のうち、問題文に出てきた問題の数">${total}問中${x.ids.length}問に登場</span><span class="tt">${esc(x.t)}</span>${x.en?`<span class="en">${esc(x.en)}</span>`:""}<span class="ld">${md(x.lead)}</span><span class="no" aria-hidden="true">${String(i+1).padStart(2,"0")}</span></summary>
+        ${k || !d.read ? "" : `<div class="callout rd" style="margin-bottom:12px"><b>${esc(fieldLabel(f))} の問題文の読み方</b>${lis(d.read)}</div>`}
+        ${list.map((x, i) => { const aq = (x.aq||[]).length ? Q.filter(q=>!q.eid && x.aq.includes(q.title)) : [];
+          return `<details class="topic" ${k?"open":""}>
+          <summary class="${fc}"><span class="kick">科目B ${trend?"新傾向":"頻出用語"}｜${esc(fieldLabel(f))}</span>${badge(x, total)}<span class="tt">${esc(x.t)}</span>${x.en?`<span class="en">${esc(x.en)}</span>`:""}<span class="ld">${md(x.lead)}</span><span class="no" aria-hidden="true">${String(i+1).padStart(2,"0")}</span></summary>
           <div class="tb">${guideBody(x.b)}
-            <div class="rel"><span class="small"><span class="muted">この用語が出た問題：</span>${x.ids.slice().reverse().map(id=>PMBY[id]?`<a data-pmopen="${id}" style="cursor:pointer;margin-right:8px;white-space:nowrap">${esc(short(id))}</a>`:"").join(" ")}</span>
-              ${x.guide && GUIDE.some(t=>t.id===x.guide) ? `<span class="glinks" style="margin:0">📘 要点解説：<a data-topic="${x.guide}">${esc(GUIDE.find(t=>t.id===x.guide).t)}</a></span>` : ""}</div>
-          </div></details>`).join("")}`; }).join("") || `<div class="empty">該当する用語がありません</div>`;
-    body = `<p class="small muted" style="margin:4px 0 10px">平成25年春〜令和7年秋の問題冊子で、その用語が出てきた問題の数を数えて、多いものを選んでいます。</p>` + body;
+            <div class="rel"><span class="small">${x.ids.length ? `<span class="muted">${trend?"令和4年以降で":"この用語が"}出た問題：</span>${x.ids.slice().reverse().map(id=>PMBY[id]?`<a data-pmopen="${id}" style="cursor:pointer;margin-right:8px;white-space:nowrap">${esc(short(id))}</a>`:"").join(" ")}` : `<span class="muted">科目Bの問題文にはまだ出ていない用語です</span>`}</span>
+              ${x.guide && GUIDE.some(t=>t.id===x.guide) ? `<span class="glinks" style="margin:0">📘 要点解説：<a data-topic="${x.guide}">${esc(GUIDE.find(t=>t.id===x.guide).t)}</a></span>` : ""}
+              ${aq.length ? `<button class="btn sm primary" data-aq="${esc(f)}|${d.list.indexOf(x)}">科目Aの新傾向問題を解く（${aq.length}問）</button>` : ""}</div>
+          </div></details>`; }).join("")}`; }).join("") || `<div class="empty">該当する用語がありません</div>`;
+    const seg = `<span class="seg" style="margin:4px 0 8px">${[["freq","過去の頻出"],["trend","新傾向"]].map(([v,l])=>`<label><input type="radio" name="tm" value="${v}" ${QK.tm===v?"checked":""}>${l}</label>`).join("")}</span>`;
+    body = seg + (trend
+      ? `<p class="small muted" style="margin:4px 0 10px">「↑ 増加」は、令和4年以降の科目Bで問題文に出てくることが増えた用語（それ以前と、出てきた問題の割合を比べたもの）。「予想」は、科目Aの新傾向では出題されているが、科目Bの問題文にはまだほとんど出ていない用語で、設問例は<b>予想</b>です。</p>`
+      : `<p class="small muted" style="margin:4px 0 10px">平成25年春〜令和7年秋の問題冊子で、その用語が出てきた問題の数を数えて、多いものを選んでいます。</p>`) + body;
   } else {
     body = (QK.field ? [QK.field] : QK_FIELDS).map(f => { const d = PMQ.fields[f], qs = PM.filter(q=>q.field===f || (f==="経営戦略" && q.field==="情報戦略")).slice().reverse();   // 情報戦略は1問だけなので経営戦略にまとめる
       return `<div class="panel" style="margin-bottom:12px">
@@ -995,6 +1007,7 @@ function renderPmQuick(){
   if (qs) { let tm; qs.oninput = () => { clearTimeout(tm); tm = setTimeout(() => { QK.q = qs.value; renderPmQuick(); const i = $("#qks"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); }; }
   $("#app").onchange = e => { const t = e.target;
     if (t.name === "qt") { QK.tab = t.value; QK.open = false; qkPersist(); renderPmQuick(); }
+    if (t.name === "tm") { QK.tm = t.value; QK.field = ""; qkPersist(); renderPmQuick(); }
     if (t.id === "qfs") { QK.field = t.value; QK.cur = null; QK.di = -1; QK.open = false; QK.draft = ""; qkPersist(); renderPmQuick(); } };
   $("#app").onclick = e => { const t = e.target.closest("button,a"); if (!t) return;
     if (t.id === "qkback") go("pm");
@@ -1002,6 +1015,8 @@ function renderPmQuick(){
     if (t.id === "qknext") { QK.di = -1; QK.open = false; renderPmQuick(); window.scrollTo(0,0); }
     if (t.dataset.topic) openTopic(t.dataset.topic);
     if (t.dataset.pmopen) openPm(t.dataset.pmopen);
+    if (t.dataset.aq) { const [f, i] = t.dataset.aq.split("|"), x = PMQ.trend[f].list[+i];
+      startQuiz(shuffle(Q.filter(q=>!q.eid && x.aq.includes(q.title))), {mode:"study", title:`新傾向：${x.t}`}); }
     if (t.dataset.qg) { (S.pq = S.pq || {})[QK.cur] = { t:Date.now(), g:+t.dataset.qg }; save();
       QK.last = QK.cur; QK.cur = null; QK.open = false; QK.draft = ""; renderPmQuick(); window.scrollTo(0,0); } };
 }
