@@ -189,6 +189,8 @@ main.gwide{max-width:1180px}
 .callout.plus{background:var(--bg);border:1px solid var(--line)} .callout.plus>b:first-child{color:var(--muted)}
 .callout.plus dl{margin:2px 0 0} .callout.plus dt{font-weight:700;display:inline} .callout.plus dt::after{content:"："} .callout.plus dd{display:inline;margin:0} .callout.plus dd::after{content:"";display:block;margin-bottom:4px}
 .callout.ex{background:var(--bg);border:1px dashed var(--line)}
+.callout.pt{background:var(--accent-soft);border-left:4px solid var(--accent)} .callout.pt>b:first-child{color:var(--accent)}
+.callout.rd{background:var(--bg);border:1px solid var(--line);border-left:4px solid var(--S)} .callout.rd>b:first-child{color:var(--S)}
 .callout ul{margin:.2em 0 0;padding-left:1.2em}
 .tw{overflow-x:auto;margin:10px 0;-webkit-overflow-scrolling:touch}
 .tw table{border-collapse:collapse;width:100%;min-width:420px;font-size:.9rem}
@@ -650,6 +652,8 @@ function block(b){
   // trap は 1文（文字列）でも、複数の注意点（配列）でもよい
   if (type==="trap") return `<div class="callout trap"><b>⚠ ひっかけ注意</b>${Array.isArray(a)?lis(a):md(a)}</div>`;
   if (type==="tip") return `<div class="callout tip"><b>覚え方</b>${md(a)}</div>`;
+  if (type==="pt") return `<div class="callout pt"><b>設問を読み解くポイント</b>${Array.isArray(a)?lis(a):md(a)}</div>`;
+  if (type==="rd") return `<div class="callout rd"><b>問題文の読み方</b>${Array.isArray(a)?lis(a):md(a)}</div>`;
   // ["name", [[略語の文字, 元の語], ...], 補足]
   if (type==="name") return `<div class="gname"><div class="gh">名前</div><div class="chips">${a.map(([k,w])=>`<span class="nm"><b>${esc(k)}</b><span>${md(w)}</span></span>`).join("")}</div>${c?`<div class="small">${md(c)}</div>`:""}</div>`;
   // ["pc", メリット[], デメリット[], 対象]
@@ -883,7 +887,11 @@ function openPm(id){ PSET.cur = id; PSET.tab = "q"; pmPersist(); PM_T0 = Date.no
    ミニ問題の記録は S.pq[id] = { t:更新時刻, g:1（○）| 0.5（△）| 0（×） }。 */
 const PMQ = DATA.pmq || {fields:{}, mini:[]};
 const QK_FIELDS = PM_FIELDS.filter(f => PMQ.fields[f]);
-let QK = { tab:"mini", field:"", cur:null, last:null, open:false, draft:"", di:-1 };
+// 平成26年春以降の問番号（問1は必須）。頻出用語は本番と同じ問番号の順に並べる
+const PM_NO = {"情報セキュリティ":1, "経営戦略":2, "プログラミング":3, "システムアーキテクチャ":4, "ネットワーク":5, "データベース":6, "組込みシステム開発":7, "情報システム開発":8, "プロジェクトマネジメント":9, "サービスマネジメント":10, "システム監査":11};
+const TERM_FIELDS = Object.keys(PMQ.terms || {}).sort((a,b)=>(PM_NO[a]||99)-(PM_NO[b]||99));
+const fieldLabel = f => PM_NO[f] ? `問${PM_NO[f]} ${f}` : f;
+let QK = { tab:"mini", field:"", cur:null, last:null, open:false, draft:"", di:-1, q:"" };
 try { const v = JSON.parse(localStorage.getItem(KEY+"-pq")||"{}"); QK.tab = v.tab || QK.tab; QK.field = v.field || ""; } catch(e) {}
 const qkPersist = () => { try { localStorage.setItem(KEY+"-pq", JSON.stringify({tab:QK.tab, field:QK.field})); } catch(e) {} };
 const paren = s => (s||"").replace(/（/g,"(").replace(/）/g,")").replace(/\s/g,"");
@@ -907,10 +915,10 @@ function miniPick(){
   return (l.length > 1 ? l.filter(m => m.id !== QK.last) : l)[0] || null;
 }
 function renderPmQuick(){
-  const tabs = [["mini","記述ミニ問題"],["drill","つまずきドリル"],["tips","分野別攻略"]];
-  const fields = QK.tab === "drill" ? PM_FIELDS : QK_FIELDS;
+  const tabs = [["mini","記述ミニ問題"],["drill","つまずきドリル"],["terms","頻出用語"],["tips","分野別攻略"]];
+  const fields = (QK.tab === "drill" ? PM_FIELDS : QK.tab === "terms" ? TERM_FIELDS : QK_FIELDS).slice().sort((a,b)=>(PM_NO[a]||99)-(PM_NO[b]||99));
   if (QK.field && !fields.includes(QK.field)) QK.field = "";
-  const chips = `<div class="row" style="margin-top:10px"><select id="qfs"><option value="">すべての分野</option>${fields.map(f=>`<option value="${esc(f)}" ${QK.field===f?"selected":""}>${esc(f)}</option>`).join("")}</select></div>`;
+  const chips = `<div class="row" style="margin-top:10px"><select id="qfs"><option value="">すべての分野</option>${fields.map(f=>`<option value="${esc(f)}" ${QK.field===f?"selected":""}>${esc(fieldLabel(f))}</option>`).join("")}</select>${QK.tab==="terms"?`<input type="search" id="qks" placeholder="用語を検索（例：DNS、ログ）" value="${esc(QK.q)}" style="flex:1;min-width:160px">`:""}</div>`;
   let body = "";
   if (QK.tab === "mini") {
     const m = PMQ.mini.find(x => x.id === QK.cur) || miniPick(); QK.cur = m && m.id;
@@ -947,6 +955,23 @@ function renderPmQuick(){
         <div class="row spread" style="margin-top:10px"><button class="btn sm ghost" data-pmopen="${c.q.id}">この問題を開く</button><button class="btn sm primary" id="qknext">次のカード →</button></div>
       </div>
       <p class="note">採点講評はIPAが公表したもので、受験者が実際につまずいた設問と誤答の傾向が書かれています。問題文を読む前に「どこで間違えやすいか」を知っておくと、本番で同じ失敗を避けられます。</p>`;
+  } else if (QK.tab === "terms") {
+    // 要点解説と同じカードで表示する（帯：分野色・用語名・正式名称・ひとこと、本文：左に図と解説、右に表・設問のポイント・読み方）
+    const k = QK.q.trim().toLowerCase();
+    const short = id => { const q = PMBY[id]; return `${q.src.replace(/年度?|期/g,"").replace("平成","H").replace("令和","R")} 問${q.no}`; };
+    body = (QK.field ? [QK.field] : TERM_FIELDS).map(f => {
+      const d = PMQ.terms[f], total = PM.filter(q=>q.field===f).length, fc = f === "経営戦略" ? "S" : ["プロジェクトマネジメント","サービスマネジメント","システム監査"].includes(f) ? "M" : "T";
+      const list = d.list.filter(x => !k || JSON.stringify([x.t, x.en, x.lead, x.b]).toLowerCase().includes(k));
+      if (k && !list.length) return "";
+      return `<div class="gsec"><span class="tag ${fc}">${esc(fieldLabel(f))}</span></div>
+        ${k ? "" : `<div class="callout rd" style="margin-bottom:12px"><b>${esc(fieldLabel(f))} の問題文の読み方</b>${lis(d.read)}</div>`}
+        ${list.map((x, i) => `<details class="topic" ${k?"open":""}>
+          <summary class="${fc}"><span class="kick">科目B 頻出用語｜${esc(fieldLabel(f))}</span><span class="lv" title="過去${total}問のうち、問題文に出てきた問題の数">${total}問中${x.ids.length}問に登場</span><span class="tt">${esc(x.t)}</span>${x.en?`<span class="en">${esc(x.en)}</span>`:""}<span class="ld">${md(x.lead)}</span><span class="no" aria-hidden="true">${String(i+1).padStart(2,"0")}</span></summary>
+          <div class="tb">${guideBody(x.b)}
+            <div class="rel"><span class="small"><span class="muted">この用語が出た問題：</span>${x.ids.slice().reverse().map(id=>PMBY[id]?`<a data-pmopen="${id}" style="cursor:pointer;margin-right:8px;white-space:nowrap">${esc(short(id))}</a>`:"").join(" ")}</span>
+              ${x.guide && GUIDE.some(t=>t.id===x.guide) ? `<span class="glinks" style="margin:0">📘 要点解説：<a data-topic="${x.guide}">${esc(GUIDE.find(t=>t.id===x.guide).t)}</a></span>` : ""}</div>
+          </div></details>`).join("")}`; }).join("") || `<div class="empty">該当する用語がありません</div>`;
+    body = `<p class="small muted" style="margin:4px 0 10px">平成25年春〜令和7年秋の問題冊子で、その用語が出てきた問題の数を数えて、多いものを選んでいます。</p>` + body;
   } else {
     body = (QK.field ? [QK.field] : QK_FIELDS).map(f => { const d = PMQ.fields[f], qs = PM.filter(q=>q.field===f || (f==="経営戦略" && q.field==="情報戦略")).slice().reverse();   // 情報戦略は1問だけなので経営戦略にまとめる
       return `<div class="panel" style="margin-bottom:12px">
@@ -963,8 +988,11 @@ function renderPmQuick(){
     <span class="seg">${tabs.map(([v,l])=>`<label><input type="radio" name="qt" value="${v}" ${QK.tab===v?"checked":""}>${l}</label>`).join("")}</span>
     ${chips}
     <div style="margin-top:12px">${body}</div>`;
+  $("#app").classList.toggle("gwide", QK.tab === "terms");
   const ta = $("#qka");
   if (ta) ta.oninput = () => { QK.draft = ta.value; const m = PMQ.mini.find(x=>x.id===QK.cur); $("#qkn").textContent = `${[...ta.value].length}字 / ${m.lim}字`; };
+  const qs = $("#qks");
+  if (qs) { let tm; qs.oninput = () => { clearTimeout(tm); tm = setTimeout(() => { QK.q = qs.value; renderPmQuick(); const i = $("#qks"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); }; }
   $("#app").onchange = e => { const t = e.target;
     if (t.name === "qt") { QK.tab = t.value; QK.open = false; qkPersist(); renderPmQuick(); }
     if (t.id === "qfs") { QK.field = t.value; QK.cur = null; QK.di = -1; QK.open = false; QK.draft = ""; qkPersist(); renderPmQuick(); } };
