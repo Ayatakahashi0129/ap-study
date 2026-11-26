@@ -192,6 +192,33 @@ def answers(code):
     return res
 
 
+KATA = "アイウエオカキクケコサシスセソタチツテト"
+# OCRがカタカナの記号を形の似た漢字で読むことがある（エ→工、カ→力 など）
+LOOKALIKE = {"工": "エ", "力": "カ", "才": "オ", "夕": "タ", "卜": "ト", "口": "ロ"}
+
+
+def choice_count(pages, pgs):
+    """問題文にある解答群の記号の数（ア〜？）。行頭の1文字のカタカナで、すぐ後ろに間が空いているものを記号とみなし、
+    アから途切れずに続く最後の記号までを数える（本文の行頭のカタカナが紛れても、途中が抜けるので数に入らない）。"""
+    found = set()
+    for pg in pgs:
+        for l in pages[pg]["lines"]:
+            ws = l["words"]
+            for i, w in enumerate(ws):
+                t = LOOKALIKE.get(N(w["t"]), N(w["t"]))
+                if len(t) != 1 or t not in KATA:
+                    continue
+                gap_after = ws[i + 1]["x"] - (w["x"] + w["w"]) if i + 1 < len(ws) else 99
+                gap_before = w["x"] - (ws[i - 1]["x"] + ws[i - 1]["w"]) if i else 99
+                # 記号の後ろは少し空き、行の途中の記号（2列に並んだ解答群の右側）は前も大きく空く
+                if gap_after > w["w"] * 0.8 and gap_before > w["w"] * 1.5:
+                    found.add(t)
+    n = 0
+    while n < len(KATA) and KATA[n] in found:
+        n += 1
+    return n
+
+
 def comments(code):
     """採点講評PDFから、問番号 → 講評（段落ごとに改行）"""
     d = pymupdf.open(DIR / f"{code}_ap_pm_cmnt.pdf")
@@ -260,6 +287,7 @@ def main():
     out, report = [], []
     for code, eid, src in EXAMS:
         pages = json.load(open(DIR / "ocr" / f"{code}.json", encoding="utf-8-sig"))
+        pages_by_no = {p["page"]: p for p in pages}
         seg, tl, ans, cm = segment(code, pages), topic_list(pages), answers(code), comments(code)
         doc = pymupdf.open(DIR / f"{code}_ap_pm_qs.pdf")
         report.append(f"{eid}: 問題 {len(seg)}  一覧 {len(tl)}  解答例 {len(ans)}")
@@ -288,7 +316,8 @@ def main():
             # 平成25年春までは 問1・2から1問、問3〜12から5問。以後は 問1必須、問2〜11から4問
             sel = ("問1・2から1問" if i <= 2 else "問3〜12から5問") if len(seg) == 12 else ("必須" if i == 1 else "問2〜11から4問")
             out.append({"id": f"{eid}-pm{i}", "src": src, "eid": eid, "no": i, "field": f, "theme": theme, "sel": sel,
-                        "img": imgs, "aim": a["aim"], "rows": a["rows"], "cmnt": cm.get(i, ""), **extra})
+                        "img": imgs, "aim": a["aim"], "rows": a["rows"], "cmnt": cm.get(i, ""),
+                        "kc": choice_count(pages_by_no, pgs), **extra})
     (SRC / "data" / "pm.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print("\n".join(report))
     print("問題数:", len(out), " ページ画像:", sum(len(q["img"]) for q in out))

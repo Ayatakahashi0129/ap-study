@@ -1024,7 +1024,9 @@ function renderPmQuick(){
 function pmRowsHTML(q){
   const r = S.pm[q.id] || {a:{}, g:{}}, done = !!r.done;
   // 解答群の記号は冊子で確かめる必要があるので、ア〜クを基本にし、それより後ろの記号が答えにある問題だけ広げる
-  const maxK = Math.max(7, ...q.rows.filter(x=>isChoice(x.a)).flatMap(x=>x.a.split(/\s*[,，、]\s*/)).map(k=>KATA.indexOf(k)));
+  // 記号の数は問題文の解答群から数えた q.kc。数え漏れ（答えの記号より少ない）のときは、答えの見当がつかないようア〜ソまで出す
+  const need = Math.max(-1, ...q.rows.filter(x=>isChoice(x.a)).flatMap(x=>x.a.split(/\s*[,，、]\s*/)).map(k=>KATA.indexOf(k))) + 1;
+  const maxK = (q.kc >= need ? q.kc : Math.max(15, need)) - 1;
   let last = "";
   return q.rows.map((row, i) => {
     const head = row.s !== last ? `<div class="ans-s">${esc(row.s || "解答")}</div>` : ""; last = row.s;
